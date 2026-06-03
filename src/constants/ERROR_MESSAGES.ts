@@ -1,0 +1,20 @@
+// ─── Error messages ───────────────────────────────────────────────────────────
+export const ERROR_MESSAGES: Record<string, string> = {
+  "Invalid email or password":                                   "The email or password you entered is incorrect.",
+  "Access denied. Admin accounts only.":                        "This portal is for admin accounts only.",
+  "Your account has been disabled. Please contact support.":    "Your account is disabled. Please contact your administrator.",
+  "Email and password are required":                            "Please enter both email and password.",
+  "Server error":                                               "Something went wrong on our end. Please try again later.",
+  "Invalid or expired OTP":                                     "The code you entered is invalid or has expired.",
+  "Email and OTP code are required":                            "Please enter the verification code.",
+  "Product name is required":                           "Please enter a product name.",
+  "Term value is required":                             "Please enter a term value.",
+  "Minimum amount is required":                         "Please enter a minimum amount.",
+  "Maximum amount is required":                         "Please enter a maximum amount.",
+  "Minimum amount must be less than maximum amount":    "Minimum amount must be less than the maximum amount.",
+  "Product name already exists":                        "A product with this name already exists. Please choose a different name.",
+  "Product not found":                               "This product no longer exists. It may have been deleted.",
+  "Email already in use":    "This email is already registered to another user.",
+  "Staff ID already in use": "This Staff ID is already assigned to another user.",
+  "Access role not found":   "The selected access role no longer exists. Please refresh and try again.",
+};
