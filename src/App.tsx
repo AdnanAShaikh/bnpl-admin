@@ -99,7 +99,6 @@ useEffect(() => {
 
         // refresh failed
         if (!refreshRes.ok) {
-
           dispatch(logoutAdmin());
 
           toast.error(
