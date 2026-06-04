@@ -74,11 +74,6 @@ export interface Merchant {
 }
 
 // ─── Shared Input Payload Types ───────────────────────────────────────────────
-interface ProfilePayload {
-  name:     string;
-  email:    string;
-  password: string;
-}
 
 interface BuyerCompanyPayload {
   companyName:             string;

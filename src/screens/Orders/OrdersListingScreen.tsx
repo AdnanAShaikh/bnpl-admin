@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState } from "react";
+import { useState } from "react";
 import Sidebar from "../../components/Sidebar";
 import DataTable from "../../components/DataTable";
 import type { ColumnDef, RowAction } from "../../components/DataTable";

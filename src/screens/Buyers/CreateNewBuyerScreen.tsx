@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import Sidebar from "../../components/Sidebar";
 import { Input } from "../../components/Input";
 import { useNavigate } from "react-router-dom";
@@ -6,7 +6,6 @@ import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { createNewBuyer, fetchAllBuyers, selectActionLoading } from "../../store/slices/adminSlice";
 import { toast } from "react-toastify";
 
-const NAVY = "#1a2a4a";
 type Errors = Record<string, string>;
 
 const CreateNewBuyerScreen = () => {

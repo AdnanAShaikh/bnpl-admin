@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Input } from '../components/Input'
 import { useAppDispatch } from '../store/hooks'
 import { useNavigate } from 'react-router-dom';
@@ -12,7 +12,6 @@ const ForgotPassword = () => {
     const [password, setPassword] = useState('')
     const [confirmPassword, setConfirmPassword] = useState('')
     const [error, setError] = useState("");
-    const [loading, setLoading] = useState(false);
     const [timeLeft, setTimeLeft] = useState(15 * 60);
 
     useEffect(() => {
@@ -102,7 +101,6 @@ const formatTime = (seconds: number) => {
 
     setError("");
 
-    setLoading(true);
 
     const result = await dispatch(
         forgotPassword({
@@ -110,7 +108,6 @@ const formatTime = (seconds: number) => {
         })
     );
 
-    setLoading(false);
 
     if (forgotPassword.fulfilled.match(result)) {
 

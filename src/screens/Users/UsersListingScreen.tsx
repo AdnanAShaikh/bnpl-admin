@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 import Sidebar from "../../components/Sidebar";
 import DataTable from "../../components/DataTable";
 import type { ColumnDef, RowAction } from "../../components/DataTable";
@@ -7,7 +7,6 @@ import { useNavigate } from "react-router-dom";
 import {
   fetchAllAdminUsers,
   selectUsers,
-  selectUsersLoading,
   selectUsersError,
   type AdminUser,
 } from "../../store/slices/adminSlice";
@@ -63,7 +62,6 @@ const UsersListingScreen = () => {
 
   const canCreate = usePermission("user.create");
   const canEdit   = usePermission("user.edit");
-  const canView = usePermission("user.view");
   const canChangePassword = usePermission("user.ChangePassword");
 
   useEffect(() => {

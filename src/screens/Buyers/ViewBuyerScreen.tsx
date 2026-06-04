@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Sidebar from "../../components/Sidebar";
 import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
@@ -190,7 +190,15 @@ const ViewBuyerScreen = () => {
             onChange={(_, v) => setActiveTab(v)}
             variant="scrollable"
             scrollButtons="auto"
-            TabIndicatorProps={{ style: { background: NAVY, height: 3, borderRadius: 2 } }}
+            slotProps={{
+              indicator: {
+                style: {
+                  background: NAVY,
+                  height: 3,
+                  borderRadius: 2,
+                },
+              },
+            }}            
             sx={{
               "& .MuiTab-root": {
                 textTransform: "none",

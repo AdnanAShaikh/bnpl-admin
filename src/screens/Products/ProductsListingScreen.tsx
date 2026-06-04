@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 import Sidebar from "../../components/Sidebar";
 import DataTable from "../../components/DataTable";
 import type { ColumnDef, RowAction } from "../../components/DataTable";
