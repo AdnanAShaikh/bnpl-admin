@@ -126,7 +126,7 @@ useEffect(() => {
         dispatch(logoutAdmin());
 
         toast.error(
-          "Session expired. Please login again. 222"
+          "Session expired. Please login again."
         );
       }
 
