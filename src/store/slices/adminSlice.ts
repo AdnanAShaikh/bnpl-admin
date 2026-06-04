@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { apiFetch } from "../../utils/apiFetch";
 
 // ─── Shared Base Types ────────────────────────────────────────────────────────
 interface UserInfo {
@@ -415,7 +416,7 @@ export const fetchAllBuyers = createAsyncThunk<BuyerListResponse, void, { reject
   "admin/fetchAllBuyers",
   async (_, { rejectWithValue }) => {
     try {
-      const res  = await fetch("/api/buyer/buyers/all");
+      const res  = await apiFetch("/api/buyer/buyers/all");
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to fetch buyers");
       return data;
@@ -427,7 +428,7 @@ export const fetchAllMerchants = createAsyncThunk<MerchantListResponse, void, { 
   "admin/fetchAllMerchants",
   async (_, { rejectWithValue }) => {
     try {
-      const res  = await fetch("/api/merchant/merchants/all");
+      const res  = await apiFetch("/api/merchant/merchants/all");
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to fetch merchants");
       return data;
@@ -440,7 +441,7 @@ export const createNewBuyer = createAsyncThunk<CreateBuyerResponse, CreateBuyerP
   "admin/createNewBuyer",
   async (payload, { rejectWithValue }) => {
     try {
-      const res  = await fetch("/api/buyer/create", {
+      const res  = await apiFetch("/api/buyer/create", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(payload),
@@ -456,7 +457,7 @@ export const createNewMerchant = createAsyncThunk<CreateMerchantResponse, Create
   "admin/createNewMerchant",
   async (payload, { rejectWithValue }) => {
     try {
-      const res  = await fetch("/api/merchant/create", {
+      const res  = await apiFetch("/api/merchant/create", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(payload),
@@ -474,7 +475,7 @@ export const updateBuyer = createAsyncThunk<UpdateBuyerResponse, UpdateBuyerPayl
   async (payload, { rejectWithValue }) => {
     try {
       const { id, ...body } = payload;
-      const res  = await fetch(`/api/buyer/update/${id}`, {
+      const res  = await apiFetch(`/api/buyer/update/${id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
@@ -490,7 +491,7 @@ export const updateMerchant = createAsyncThunk<UpdateMerchantResponse, UpdateMer
   async (payload, { rejectWithValue }) => {
     try {
       const { id, ...body } = payload;
-      const res  = await fetch(`/api/merchant/update/${id}`, {
+      const res  = await apiFetch(`/api/merchant/update/${id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
@@ -506,7 +507,7 @@ export const fetchAllRoles = createAsyncThunk<RoleListResponse, void, { rejectVa
   "admin/fetchAllRoles",
   async (_, { rejectWithValue }) => {
     try {
-      const res  = await fetch("/api/role/all");
+      const res  = await apiFetch("/api/role/all");
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to fetch roles");
       return data;
@@ -519,7 +520,7 @@ export const createNewRole = createAsyncThunk<RoleResponse, CreateRolePayload, {
   "admin/createNewRole",
   async (payload, { rejectWithValue }) => {
     try {
-      const res  = await fetch("/api/role/create", {
+      const res  = await apiFetch("/api/role/create", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
@@ -536,7 +537,7 @@ export const updateRole = createAsyncThunk<RoleResponse, UpdateRolePayload, { re
   async (payload, { rejectWithValue }) => {
     try {
       const { id, ...body } = payload;
-      const res  = await fetch(`/api/role/update/${id}`, {
+      const res  = await apiFetch(`/api/role/update/${id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
@@ -552,7 +553,7 @@ export const deleteRole = createAsyncThunk<DeleteRoleResponse & { id: number }, 
   "admin/deleteRole",
   async (id, { rejectWithValue }) => {
     try {
-      const res  = await fetch(`/api/role/delete/${id}`, { method: "DELETE" });
+      const res  = await apiFetch(`/api/role/delete/${id}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to delete role");
       return { ...data, id }; // pass id back so we can remove from state
@@ -566,7 +567,7 @@ export const fetchAllAdminUsers = createAsyncThunk<UserListResponse, void, { rej
   "admin/fetchAllAdminUsers",
   async (_, { rejectWithValue }) => {
     try {
-      const res  = await fetch("/api/adminUser/all");
+      const res  = await apiFetch("/api/adminUser/all");
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to fetch users");
       return data;
@@ -579,7 +580,7 @@ export const createAdminUser = createAsyncThunk<UserResponse, CreateUserPayload,
   "admin/createAdminUser",
   async (payload, { rejectWithValue }) => {
     try {
-      const res  = await fetch("/api/adminUser/create", {
+      const res  = await apiFetch("/api/adminUser/create", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(payload),
@@ -597,7 +598,7 @@ export const updateAdminUser = createAsyncThunk<UserResponse, UpdateUserPayload,
   async (payload, { rejectWithValue }) => {
     try {
       const { id, ...body } = payload;
-      const res  = await fetch(`/api/adminUser/update/${id}`, {
+      const res  = await apiFetch(`/api/adminUser/update/${id}`, {
         method:  "PATCH",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(body),
@@ -617,7 +618,7 @@ export const fetchAllProducts = createAsyncThunk<ProductListResponse, void, { re
   "admin/fetchAllProducts",
   async (_, { rejectWithValue }) => {
     try {
-      const res  = await fetch("/api/product/all");
+      const res  = await apiFetch("/api/product/all");
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to fetch products");
       return data;
@@ -630,7 +631,7 @@ export const createProduct = createAsyncThunk<ProductResponse, CreateProductPayl
   "admin/createProduct",
   async (payload, { rejectWithValue }) => {
     try {
-      const res  = await fetch("/api/product/create", {
+      const res  = await apiFetch("/api/product/create", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(payload),
@@ -648,7 +649,7 @@ export const updateProduct = createAsyncThunk<ProductResponse, UpdateProductPayl
   async (payload, { rejectWithValue }) => {
     try {
       const { id, ...body } = payload;
-      const res  = await fetch(`/api/product/update/${id}`, {
+      const res  = await apiFetch(`/api/product/update/${id}`, {
         method:  "PATCH",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(body),
@@ -665,7 +666,7 @@ export const deleteProduct = createAsyncThunk<DeleteProductResponse & { id: numb
   "admin/deleteProduct",
   async (id, { rejectWithValue }) => {
     try {
-      const res  = await fetch(`/api/product/delete/${id}`, { method: "DELETE" });
+      const res  = await apiFetch(`/api/product/delete/${id}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to delete product");
       return { ...data, id }; // pass id back so we can remove from state
@@ -678,10 +679,9 @@ export const loginAdmin = createAsyncThunk<LoginResponse, LoginPayload, { reject
   "admin/loginAdmin",
   async (payload, { rejectWithValue }) => {
     try {
-      const res  = await fetch("/api/auth/login", {
+      const res  = await apiFetch("/api/auth/login", {
         method:      "POST",
         headers:     { "Content-Type": "application/json" },
-        credentials: "include", // send/receive cookie
         body:        JSON.stringify(payload),
       });
       const data = await res.json();
@@ -695,9 +695,8 @@ export const logoutAdmin = createAsyncThunk<void, void, { rejectValue: string }>
   "admin/logoutAdmin",
   async (_, { rejectWithValue }) => {
     try {
-      await fetch("/api/auth/logout/admin", {
+      await apiFetch("/api/auth/logout/admin", {
         method:      "POST",
-        credentials: "include", // send cookie so server can clear it
       });
 
     } catch (err: any) { return rejectWithValue(err.message); }
@@ -708,10 +707,9 @@ export const verifyOtpForLogin = createAsyncThunk<LoginResponse, { email: string
   "admin/verifyOtpForLogin",
   async (payload, { rejectWithValue }) => {
     try {
-      const res  = await fetch("/api/auth/login/verify-otp", {
+      const res  = await apiFetch("/api/auth/login/verify-otp", {
         method:      "POST",
         headers:     { "Content-Type": "application/json" },
-        credentials: "include",
         body:        JSON.stringify(payload),
       });
       const data = await res.json();
@@ -729,7 +727,7 @@ export const deleteDocument = createAsyncThunk<
   "admin/deleteDocument",
   async (id, { rejectWithValue }) => {
     try {
-      const res  = await fetch(`/api/document/delete/${id}`, { method: "DELETE" });
+      const res  = await apiFetch(`/api/document/delete/${id}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to delete document");
       return { ...data, id };
@@ -745,7 +743,7 @@ export const emailOtpSendAndVerify = createAsyncThunk<
   "auth/emailOtpSendAndVerify",
   async (payload, { rejectWithValue }) => {
     try {
-      const res = await fetch("/api/auth/verify-otp", {
+      const res = await apiFetch("/api/auth/verify-otp", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -787,13 +785,10 @@ export const forgotPassword =
 
       try {
 
-        const res = await fetch(
+        const res = await apiFetch(
           "/api/auth/forgot-password",
           {
             method: "POST",
-
-            credentials: "include",
-
             headers: {
               "Content-Type":
                 "application/json",

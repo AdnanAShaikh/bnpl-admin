@@ -26,6 +26,7 @@ import { logoutAdmin, selectAuthUser, setAuthUser } from "./store/slices/adminSl
 import { useEffect, useRef } from "react";
 import { toast } from "react-toastify";
 import ForgotPassword from "./screens/ForgotPassword";
+import { apiFetch } from "./utils/apiFetch";
 
 // ─── Permission Guard ─────────────────────────────────────────────────────────
 // Wraps a route element and redirects to 404 if the user lacks the required permission.
@@ -76,11 +77,8 @@ useEffect(() => {
       // VERIFY ACCESS TOKEN
       // ─────────────────────────────────────────
 
-      let res = await fetch(
+      let res = await apiFetch(
         "/api/auth/verify/adminToken",
-        {
-          credentials: "include",
-        }
       );
 
       // ─────────────────────────────────────────
@@ -90,11 +88,8 @@ useEffect(() => {
       if (res.status === 401) {
 
         // try refresh
-        const refreshRes = await fetch(
+        const refreshRes = await apiFetch(
           "/api/auth/refresh/adminToken",
-          {
-            credentials: "include",
-          }
         );
 
         // refresh failed
@@ -109,11 +104,8 @@ useEffect(() => {
         }
 
         // retry verify after refresh
-        res = await fetch(
+        res = await apiFetch(
           "/api/auth/verify/adminToken",
-          {
-            credentials: "include",
-          }
         );
       }
 

@@ -1,14 +1,13 @@
 // src/components/ProtectedRoute.tsx
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
+import { apiFetch } from "../utils/apiFetch";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const [status, setStatus] = useState<"checking" | "ok" | "fail">("checking");
 
   useEffect(() => {
-    fetch("/api/auth/verify", {
-      credentials: "include",
-    })
+    apiFetch("/api/auth/verify")
       .then((res) => setStatus(res.ok ? "ok" : "fail"))
       .catch(() => setStatus("fail"));
   }, []);
