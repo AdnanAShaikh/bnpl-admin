@@ -15,6 +15,7 @@ import {
   updateBuyer,
 } from "../../store/slices/adminSlice";
 import { toast } from "react-toastify";
+import { fetchAllPaymentPlans, selectPaymentPlan } from "../../store/slices/adminSlice";
 
 const NAVY = "#1a2a4a";
 
@@ -193,6 +194,175 @@ const DocumentsTab = ({ documents, entityId }: { documents: any[]; entityId: num
   );
 };
 
+// ─── Tab 5: Payment Plans ─────────────────────────────────────────────────────
+const PaymentPlansTab = ({
+  buyerId,
+  allPlans,
+  assignedPlans,   // server truth: buyer.eligiblePlans (full plan objects or {id, planName}[])
+}: {
+  buyerId: number;
+  allPlans: any[];
+  assignedPlans: any[];
+}) => {
+  const dispatch = useAppDispatch();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [draftIds, setDraftIds]   = useState<number[]>([]);
+  const [saving, setSaving]       = useState(false);
+
+  const assignedIds = assignedPlans.map((p) => p.id);
+
+  // Open modal: seed draft from current server truth
+  const openModal = () => {
+    setDraftIds(assignedIds);
+    setModalOpen(true);
+  };
+
+  const toggleDraft = (planId: number) =>
+    setDraftIds((prev) =>
+      prev.includes(planId) ? prev.filter((x) => x !== planId) : [...prev, planId]
+    );
+
+  const handleSavePlans = async () => {
+    setSaving(true);
+    const result = await dispatch(
+      updateBuyer({ id: buyerId, eligiblePlanIds: draftIds })
+    );
+    setSaving(false);
+
+    if (updateBuyer.fulfilled.match(result)) {
+      // re-fetch so grid reflects DB truth (slice already updates the buyer,
+      // but this guarantees eligiblePlans is fresh)
+      await dispatch(fetchAllBuyers());
+      toast.success("Payment plans updated!");
+    } else {
+      toast.error("Failed to update plans. Please try again.");
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-5">
+      {/* Header row */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-500 leading-relaxed max-w-lg">
+          Payment plans this buyer is eligible to use when requesting financing.
+        </p>
+        <button
+          onClick={openModal}
+          className="flex-shrink-0 px-5 py-2 border-2 border-[#1a2a4a] text-[#1a2a4a] font-semibold text-sm rounded-xl hover:bg-[#1a2a4a] hover:text-white transition-all duration-200"
+        >
+          + Manage Plans
+        </button>
+      </div>
+
+      {/* Assigned plans grid — server truth */}
+      {assignedPlans.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center">
+          <p className="text-sm text-gray-400">No plans assigned yet.</p>
+          <p className="text-xs text-gray-300 mt-1">Click "Manage Plans" to add some.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 gap-3">
+          {assignedPlans.map((plan) => {
+            // assignedPlans may be {id, planName} only — enrich from allPlans if available
+            const full = allPlans.find((p) => p.id === plan.id) ?? plan;
+            return (
+              <div
+                key={plan.id}
+                className="border-2 border-[#1a2a4a] bg-[#1a2a4a]/[0.03] rounded-xl px-4 py-3"
+              >
+                <p className="text-sm font-bold text-[#1a2a4a]">{full.planName}</p>
+                {full.termValue && (
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {full.termValue} × {full.termType?.toLowerCase()} · {(Number(full.profitRate) * 100).toFixed(1)}%
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── Modal ── */}
+      {modalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => !saving && setModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h3 className="text-base font-bold text-[#1a2a4a]">Manage Payment Plans</h3>
+              <button
+                onClick={() => !saving && setModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 disabled:opacity-40"
+                disabled={saving}
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {allPlans.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-6">No payment plans available.</p>
+              ) : (
+                <div className="flex flex-col gap-2.5">
+                  {allPlans.map((plan) => {
+                    const checked = draftIds.includes(plan.id);
+                    return (
+                      <label
+                        key={plan.id}
+                        className={`flex items-center justify-between border-2 rounded-xl px-4 py-3 cursor-pointer transition-all
+                          ${checked ? "border-[#1a2a4a] bg-[#1a2a4a]/[0.03]" : "border-gray-200 hover:border-gray-300"}`}
+                      >
+                        <div>
+                          <p className="text-sm font-bold text-[#1a2a4a]">{plan.planName}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {plan.termValue} × {plan.termType?.toLowerCase()} · {(Number(plan.profitRate) * 100).toFixed(1)}% profit
+                          </p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleDraft(plan.id)}
+                          className="w-5 h-5 accent-[#1a2a4a] cursor-pointer"
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100">
+              <button
+                onClick={() => setModalOpen(false)}
+                disabled={saving}
+                className="px-6 py-2 border-2 border-gray-300 text-gray-600 font-semibold text-sm rounded-xl hover:border-[#1a2a4a] hover:text-[#1a2a4a] transition-all disabled:opacity-40"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSavePlans}
+                disabled={saving}
+                className="px-8 py-2 bg-[#1a2a4a] hover:bg-[#243a64] text-white font-semibold text-sm rounded-xl transition-all disabled:opacity-60"
+              >
+                {saving ? "Saving..." : "Save Plans"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 const EditBuyerScreen = () => {
   const { id }   = useParams<{ id: string }>();
@@ -228,6 +398,8 @@ const EditBuyerScreen = () => {
     nationalIdNumber:buyer?.powerOfAttorney.nationalIdNumber || "",
   });
 
+  const allPlans = useAppSelector(selectPaymentPlan);
+
   // Re-sync when buyer loads from store after redirect
   if (buyer && !initialized.current) {
     initialized.current = true;
@@ -256,14 +428,20 @@ const EditBuyerScreen = () => {
         nationalIdNumber:buyer.powerOfAttorney.nationalIdNumber ?? "",
       });
     }
+
   }
 
   useEffect(() => {
     if (buyers.length === 0) dispatch(fetchAllBuyers());
   }, [dispatch, buyers.length]);
 
+  useEffect(() => {
+    if (allPlans.length === 0) dispatch(fetchAllPaymentPlans());
+  }, [dispatch, allPlans.length]);
+
   const patchCompany  = (k: string, v: string) => setCompanyData((p)  => ({ ...p, [k]: v }));
   const patchAttorney = (k: string, v: string) => setAttorneyData((p) => ({ ...p, [k]: v }));
+
 
   // ── No validation — save whatever is filled ──
   const handleSave = async () => {
@@ -294,6 +472,8 @@ const EditBuyerScreen = () => {
 
     if (updateBuyer.fulfilled.match(result)) {
       toast.success("Buyer updated successfully!");
+      await dispatch(fetchAllBuyers());
+
     } else {
       toast.error("Failed to update buyer. Please try again.");
     }
@@ -354,6 +534,7 @@ const EditBuyerScreen = () => {
             <Tab label="Company Details"   value={1} />
             <Tab label="Power of Attorney" value={2} />
             <Tab label="Documents"         value={3} />
+            <Tab label="Payment Plans"     value={4} />
           </Tabs>
         </div>
 
@@ -362,6 +543,13 @@ const EditBuyerScreen = () => {
           {activeTab === 1 && <CompanyDetails data={companyData} onChange={patchCompany} />}
           {activeTab === 2 && <PowerOfAttorney data={attorneyData} onChange={patchAttorney} />}
           {activeTab === 3 && <DocumentsTab documents={buyer.documents} entityId={buyer.id} />}
+          {activeTab === 4 && (
+              <PaymentPlansTab
+                  buyerId={buyer.id}
+                  allPlans={allPlans}
+                  assignedPlans={buyer.eligiblePlans ?? []}
+              />
+            )}
         </div>
       </div>
     </Sidebar>

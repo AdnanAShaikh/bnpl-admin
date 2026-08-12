@@ -60,6 +60,8 @@ export interface Buyer {
   companyDetails:  CompanyDetails;
   powerOfAttorney: PowerOfAttorney;
   documents:       any[];
+  eligiblePlans?:  { id: number; planName: string }[];   // ← add
+
 }
 
 export interface Merchant {
@@ -140,6 +142,8 @@ export interface UpdateBuyerPayload {
   status?:      string;
   companyData?: BuyerCompanyPayload;
   attorneyData?:BuyerAttorneyPayload;
+  eligiblePlanIds?: number[];                             
+
 }
 
 export interface UpdateMerchantPayload {
@@ -263,14 +267,15 @@ export interface UpdateUserPayload extends Partial<CreateUserPayload> {
   isDisabled?: boolean;
 }
 
-export interface Product {
+export interface PaymentPlan {
   id:                number;
-  productName:       string;
+  planName:          string;
   status:            "Active" | "Inactive";
   termType:          "Daily" | "Weekly" | "Biweekly" | "Monthly";
   termValue:         number;
-  minimumAmount:     number;
-  maximumAmount:     number;
+  minimumAmount:     string; // Because Decimal is "5.00" in Prisma decimal
+  maximumAmount:     string;
+  profitRate:        string;
   termDescription:   string | null;
   arabicDescription: string | null;
   additionalNotes:   string | null;
@@ -279,26 +284,27 @@ export interface Product {
   updatedAt:         string;
 }
 
-export interface ProductListResponse {
-  message:  string;
-  count:    number;
-  products: Product[];
+export interface PaymentPlanListResponse {
+  message:      string;
+  count:        number;
+  paymentPlans: PaymentPlan[];
 }
 
-export interface ProductResponse {
+export interface CreatePaymentPlanResponse {
+  message:     string;
+  paymentPlan: PaymentPlan;
+}
+
+export interface DeletePaymentPlanResponse {
   message: string;
-  product: Product;
 }
 
-export interface DeleteProductResponse {
-  message: string;
-}
-
-export interface CreateProductPayload {
-  productName:       string;
+export interface CreatePaymentPlanPayload {
+  planName:          string;
   termValue:         number;
   minimumAmount:     number;
   maximumAmount:     number;
+  profitRate:        number;
   status?:           "Active" | "Inactive";
   termType?:         "Daily" | "Weekly" | "Biweekly" | "Monthly";
   termDescription?:  string;
@@ -307,7 +313,7 @@ export interface CreateProductPayload {
   currency?:         string;
 }
 
-export interface UpdateProductPayload extends Partial<CreateProductPayload> {
+export interface UpdatePaymentPlanPayload extends Partial<CreatePaymentPlanPayload> {
   id: number;
 }
 
@@ -359,7 +365,7 @@ interface AdminState {
   merchants:        Merchant[];
   roles:            AccessRole[];   // ← add
   users:            AdminUser[];
-  products:         Product[];
+  paymentPlan:      PaymentPlan[];  // ← you started renaming but missed the array name
   authUser:         AuthUser | null;
 
 
@@ -368,7 +374,7 @@ interface AdminState {
   actionLoading:    boolean; // shared loading for all create/update actions
   rolesLoading:     boolean;        // ← add
   usersLoading:     boolean;
-  productsLoading:     boolean;
+  paymentPlanLoading:    boolean;
   authLoading:  boolean;
 
   buyersError:      string | null;
@@ -376,7 +382,7 @@ interface AdminState {
   actionError:      string | null;
   rolesError:       string | null;  // ← add
   usersError:       string | null;
-  productsError:    string | null;
+  paymentPlanError:    string | null;
   authError:    string | null;
 
 }
@@ -386,7 +392,7 @@ const initialState: AdminState = {
   merchants:        [],
   roles:            [], 
   users:            [],
-  products:            [],
+  paymentPlan:            [],
   authUser:    null,
 
 
@@ -395,7 +401,7 @@ const initialState: AdminState = {
   actionLoading:    false,
   rolesLoading:     false,          // ← add
   usersLoading:     false,
-  productsLoading:     false,
+  paymentPlanLoading:     false,
   authLoading: false,
 
 
@@ -404,7 +410,7 @@ const initialState: AdminState = {
   actionError:      null,
   rolesError:       null,  // ← add
   usersError:       null,
-  productsError:       null,
+  paymentPlanError:       null,
   authError:   null,
   
 };
@@ -611,64 +617,64 @@ export const updateAdminUser = createAsyncThunk<UserResponse, UpdateUserPayload,
 );
 
 
-// Products
+// Payment Plan
 
-// ── Fetch All Products ──
-export const fetchAllProducts = createAsyncThunk<ProductListResponse, void, { rejectValue: string }>(
-  "admin/fetchAllProducts",
+// ── Fetch All Payment Plan ──
+export const fetchAllPaymentPlans = createAsyncThunk<PaymentPlanListResponse, void, { rejectValue: string }>(
+  "admin/fetchAllPaymentPlans",
   async (_, { rejectWithValue }) => {
     try {
-      const res  = await apiFetch("/api/product/all");
+      const res  = await apiFetch("/api/payment-plan/all");
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed to fetch products");
+      if (!res.ok) throw new Error(data.message || "Failed to fetch payment plans!");
       return data;
     } catch (err: any) { return rejectWithValue(err.message); }
   }
 );
 
-// ── Create Product ──
-export const createProduct = createAsyncThunk<ProductResponse, CreateProductPayload, { rejectValue: string }>(
-  "admin/createProduct",
+// ── Create Payment Plan ──
+export const createPaymentPlan = createAsyncThunk<CreatePaymentPlanResponse, CreatePaymentPlanPayload, { rejectValue: string }>(
+  "admin/createPaymentPlan",
   async (payload, { rejectWithValue }) => {
     try {
-      const res  = await apiFetch("/api/product/create", {
+      const res  = await apiFetch("/api/payment-plan/create", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(payload),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed to create product");
+      if (!res.ok) throw new Error(data.message || "Failed to create payment plan!");
       return data;
     } catch (err: any) { return rejectWithValue(err.message); }
   }
 );
 
-// ── Update Product ──
-export const updateProduct = createAsyncThunk<ProductResponse, UpdateProductPayload, { rejectValue: string }>(
-  "admin/updateProduct",
+// ── Update Payment Plan ──
+export const updatePaymentPlan = createAsyncThunk<CreatePaymentPlanResponse, UpdatePaymentPlanPayload, { rejectValue: string }>(
+  "admin/updatePaymentPlan",
   async (payload, { rejectWithValue }) => {
     try {
       const { id, ...body } = payload;
-      const res  = await apiFetch(`/api/product/update/${id}`, {
+      const res  = await apiFetch(`/api/payment-plan/update/${id}`, {
         method:  "PATCH",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(body),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed to update product");
+      if (!res.ok) throw new Error(data.message || "Failed to update payment plan!");
       return data;
     } catch (err: any) { return rejectWithValue(err.message); }
   }
 );
 
-// ── Delete Product ──
-export const deleteProduct = createAsyncThunk<DeleteProductResponse & { id: number }, number, { rejectValue: string }>(
-  "admin/deleteProduct",
+// ── Delete Payment Plan ──
+export const deletePaymentPlan = createAsyncThunk<DeletePaymentPlanResponse & { id: number }, number, { rejectValue: string }>(
+  "admin/deletePaymentPlan",
   async (id, { rejectWithValue }) => {
     try {
-      const res  = await apiFetch(`/api/product/delete/${id}`, { method: "DELETE" });
+      const res  = await apiFetch(`/api/payment-plan/delete/${id}`, { method: "DELETE" });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed to delete product");
+      if (!res.ok) throw new Error(data.message || "Failed to delete payment plan!");
       return { ...data, id }; // pass id back so we can remove from state
     } catch (err: any) { return rejectWithValue(err.message); }
   }
@@ -939,39 +945,39 @@ const adminSlice = createSlice({
         .addCase(updateAdminUser.rejected,  (state, action) => { state.actionLoading = false; state.actionError = action.payload ?? "Something went wrong"; });
 
 
-        // Products
+        // Payment Plan
           builder
-            .addCase(fetchAllProducts.pending,   (state) => { state.productsLoading = true;  state.productsError = null; })
-            .addCase(fetchAllProducts.fulfilled, (state, action) => { state.productsLoading = false; state.products = action.payload.products; })
-            .addCase(fetchAllProducts.rejected,  (state, action) => { state.productsLoading = false; state.productsError = action.payload ?? "Something went wrong"; });
+            .addCase(fetchAllPaymentPlans.pending,   (state) => { state.paymentPlanLoading = true;  state.paymentPlanError = null; })
+            .addCase(fetchAllPaymentPlans.fulfilled, (state, action) => { state.paymentPlanLoading = false; state.paymentPlan = action.payload.paymentPlans; })
+            .addCase(fetchAllPaymentPlans.rejected,  (state, action) => { state.paymentPlanLoading = false; state.paymentPlanError = action.payload ?? "Something went wrong"; });
 
-          // ── Create Product ──
+          // ── Create Payment Plan ──
           builder
-            .addCase(createProduct.pending,   (state) => { state.actionLoading = true;  state.actionError = null; })
-            .addCase(createProduct.fulfilled, (state, action) => {
+            .addCase(createPaymentPlan.pending,   (state) => { state.actionLoading = true;  state.actionError = null; })
+            .addCase(createPaymentPlan.fulfilled, (state, action) => {
               state.actionLoading = false;
-              state.products.unshift(action.payload.product); // add to top of list
+              state.paymentPlan.unshift(action.payload.paymentPlan); // add to top of list
             })
-            .addCase(createProduct.rejected,  (state, action) => { state.actionLoading = false; state.actionError = action.payload ?? "Something went wrong"; });
+            .addCase(createPaymentPlan.rejected,  (state, action) => { state.actionLoading = false; state.actionError = action.payload ?? "Something went wrong"; });
 
-          // ── Update Product ──
+          // ── Update Payment Plan ──
           builder
-            .addCase(updateProduct.pending,   (state) => { state.actionLoading = true;  state.actionError = null; })
-            .addCase(updateProduct.fulfilled, (state, action) => {
+            .addCase(updatePaymentPlan.pending,   (state) => { state.actionLoading = true;  state.actionError = null; })
+            .addCase(updatePaymentPlan.fulfilled, (state, action) => {
               state.actionLoading = false;
-              const idx = state.products.findIndex((p) => p.id === action.payload.product.id);
-              if (idx !== -1) state.products[idx] = action.payload.product;
+              const idx = state.paymentPlan.findIndex((p) => p.id === action.payload.paymentPlan.id);
+              if (idx !== -1) state.paymentPlan[idx] = action.payload.paymentPlan;
             })
-            .addCase(updateProduct.rejected,  (state, action) => { state.actionLoading = false; state.actionError = action.payload ?? "Something went wrong"; });
+            .addCase(updatePaymentPlan.rejected,  (state, action) => { state.actionLoading = false; state.actionError = action.payload ?? "Something went wrong"; });
 
-          // ── Delete Product ──
+          // ── Delete Payment Plan ──
           builder
-            .addCase(deleteProduct.pending,   (state) => { state.actionLoading = true;  state.actionError = null; })
-            .addCase(deleteProduct.fulfilled, (state, action) => {
+            .addCase(deletePaymentPlan.pending,   (state) => { state.actionLoading = true;  state.actionError = null; })
+            .addCase(deletePaymentPlan.fulfilled, (state, action) => {
               state.actionLoading = false;
-              state.products = state.products.filter((p) => p.id !== action.payload.id);
+              state.paymentPlan = state.paymentPlan.filter((p) => p.id !== action.payload.id);
             })
-            .addCase(deleteProduct.rejected,  (state, action) => { state.actionLoading = false; state.actionError = action.payload ?? "Something went wrong"; });
+            .addCase(deletePaymentPlan.rejected,  (state, action) => { state.actionLoading = false; state.actionError = action.payload ?? "Something went wrong"; });
 
 
             // ── Login (step 1 — just sends OTP, no user yet) ──
@@ -1031,9 +1037,9 @@ export const selectUsersLoading = (state: { admin: AdminState }) => state.admin.
 export const selectUsersError   = (state: { admin: AdminState }) => state.admin.usersError;
 
 
-export const selectProducts        = (state: { admin: AdminState }) => state.admin.products;
-export const selectProductsLoading = (state: { admin: AdminState }) => state.admin.productsLoading;
-export const selectProductsError   = (state: { admin: AdminState }) => state.admin.productsError;
+export const selectPaymentPlan        = (state: { admin: AdminState }) => state.admin.paymentPlan;
+export const selectPaymentPlanLoading = (state: { admin: AdminState }) => state.admin.paymentPlanLoading;
+export const selectPaymentPlanError   = (state: { admin: AdminState }) => state.admin.paymentPlanError;
 
 export const selectAuthUser    = (state: { admin: AdminState }) => state.admin.authUser;
 export const selectAuthLoading = (state: { admin: AdminState }) => state.admin.authLoading;

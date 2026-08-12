@@ -5,9 +5,9 @@ import { SelectField } from "../../components/SelectField";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import {
-  fetchAllProducts,
-  updateProduct,
-  selectProducts,
+  fetchAllPaymentPlans,
+  updatePaymentPlan,
+  selectPaymentPlan,
 } from "../../store/slices/adminSlice";
 import { toast } from "react-toastify";
 import { ERROR_MESSAGES } from "../../constants/ERROR_MESSAGES";
@@ -37,7 +37,7 @@ type Errors = Record<string, string>;
 const validate = (data: typeof EMPTY_FORM): Errors => {
   const errs: Errors = {};
 
-  if (!data.productName.trim()) errs.productName   = "Product name is required";
+  if (!data.planName.trim())    errs.planName      = "Plan name is required";
   if (!data.status)             errs.status        = "Status is required";
   if (!data.termType)           errs.termType      = "Term type is required";
   if (!data.currency)           errs.currency      = "Currency is required";
@@ -45,6 +45,10 @@ const validate = (data: typeof EMPTY_FORM): Errors => {
   if (!data.termValue)          errs.termValue     = "Term value is required";
   else if (isNaN(Number(data.termValue)) || Number(data.termValue) <= 0)
                                 errs.termValue     = "Term value must be a positive number";
+
+  if (!data.profitRate)         errs.profitRate    = "Profit rate is required";
+  else if (isNaN(Number(data.profitRate)) || Number(data.profitRate) < 0)
+                                errs.profitRate    = "Must be a valid percentage (e.g. 5 for 5%)";
 
   if (!data.minimumAmount)      errs.minimumAmount = "Minimum amount is required";
   else if (isNaN(Number(data.minimumAmount)) || Number(data.minimumAmount) <= 0)
@@ -64,10 +68,11 @@ const validate = (data: typeof EMPTY_FORM): Errors => {
 };
 
 const EMPTY_FORM = {
-  productName:       "",
+  planName:          "",
   status:            "",
   termValue:         "",
   termType:          "",
+  profitRate:        "",
   currency:          "",
   minimumAmount:     "",
   maximumAmount:     "",
@@ -77,13 +82,13 @@ const EMPTY_FORM = {
 };
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
-const EditProductScreen = () => {
+const EditPaymentPlanScreen = () => {
   const { id }   = useParams<{ id: string }>();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
 
-  const products = useAppSelector(selectProducts);
-  const product  = products.find((p) => p.id === Number(id));
+  const paymentPlans = useAppSelector(selectPaymentPlan);
+  const plan         = paymentPlans.find((p:any) => p.id === Number(id));
 
   const [form,      setForm]      = useState(EMPTY_FORM);
   const [errors,    setErrors]    = useState<Errors>({});
@@ -93,23 +98,24 @@ const EditProductScreen = () => {
 
   // ── Bootstrap data ──
   useEffect(() => {
-    if (products.length === 0) dispatch(fetchAllProducts());
-  }, [dispatch, products.length]);
+    if (paymentPlans.length === 0) dispatch(fetchAllPaymentPlans());
+  }, [dispatch, paymentPlans.length]);
 
-  // ── Pre-fill form when product loads ──
-  if (product && !initialized.current) {
+  // ── Pre-fill form when plan loads ──
+  if (plan && !initialized.current) {
     initialized.current = true;
     setForm({
-      productName:       product.productName,
-      status:            product.status,
-      termValue:         String(product.termValue),
-      termType:          product.termType,
-      currency:          product.currency,
-      minimumAmount:     String(product.minimumAmount),
-      maximumAmount:     String(product.maximumAmount),
-      termDescription:   product.termDescription   ?? "",
-      arabicDescription: product.arabicDescription ?? "",
-      additionalNotes:   product.additionalNotes   ?? "",
+      planName:          plan.planName,
+      status:            plan.status,
+      termValue:         String(plan.termValue),
+      termType:          plan.termType,
+      profitRate:        String(Number(plan.profitRate) * 100), // stored as 0.05, show as 5
+      currency:          plan.currency,
+      minimumAmount:     String(plan.minimumAmount),
+      maximumAmount:     String(plan.maximumAmount),
+      termDescription:   plan.termDescription   ?? "",
+      arabicDescription: plan.arabicDescription ?? "",
+      additionalNotes:   plan.additionalNotes   ?? "",
     });
   }
 
@@ -121,11 +127,11 @@ const EditProductScreen = () => {
     });
 
   // ── Not found guard ──
-  if (products.length > 0 && !product) {
+  if (paymentPlans.length > 0 && !plan) {
     return (
       <Sidebar>
         <div className="flex items-center justify-center h-64">
-          <p className="text-gray-400 text-sm">Product not found.</p>
+          <p className="text-gray-400 text-sm">Payment plan not found.</p>
         </div>
       </Sidebar>
     );
@@ -143,13 +149,14 @@ const EditProductScreen = () => {
     }
 
     const result = await dispatch(
-      updateProduct({
+      updatePaymentPlan({
         id:                Number(id),
-        productName:       form.productName,
-        status:            form.status as 'Active' | 'Inactive',
+        planName:          form.planName,
+        status:            form.status as "Active" | "Inactive",
         termType:          form.termType as "Daily" | "Weekly" | "Biweekly" | "Monthly",
         currency:          form.currency,
         termValue:         Number(form.termValue),
+        profitRate:        Number(form.profitRate) / 100, // convert 5 → 0.05
         minimumAmount:     Number(form.minimumAmount),
         maximumAmount:     Number(form.maximumAmount),
         termDescription:   form.termDescription   || undefined,
@@ -158,11 +165,11 @@ const EditProductScreen = () => {
       })
     );
 
-    if (updateProduct.fulfilled.match(result)) {
-      toast.success("Product updated successfully!", { autoClose: 1500 });
-      navigate("/admin/product/all");
+    if (updatePaymentPlan.fulfilled.match(result)) {
+      toast.success("Payment plan updated successfully!", { autoClose: 1500 });
+      navigate("/admin/payment-plan/all");
     } else {
-      const raw     = result.payload ?? "Failed to update product. Please try again.";
+      const raw     = result.payload ?? "Failed to update payment plan. Please try again.";
       const message = ERROR_MESSAGES[raw] ?? raw;
       toast.error(message);
     }
@@ -174,7 +181,7 @@ const EditProductScreen = () => {
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate("/admin/product/all")}
+            onClick={() => navigate("/admin/payment-plan/all")}
             className="text-gray-400 hover:text-[#1a2a4a] transition-colors"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -182,10 +189,10 @@ const EditProductScreen = () => {
             </svg>
           </button>
           <div>
-            <h1 className="text-xl font-bold text-[#1a2a4a]">Edit Product</h1>
-            {product && (
+            <h1 className="text-xl font-bold text-[#1a2a4a]">Edit Payment Plan</h1>
+            {plan && (
               <p className="text-xs text-gray-400 mt-0.5">
-                {product.productName} · #{product.id}
+                {plan.planName} · #{plan.id}
               </p>
             )}
           </div>
@@ -200,17 +207,17 @@ const EditProductScreen = () => {
 
       <div className="flex flex-col gap-5">
         <div className="bg-white rounded-2xl border border-gray-100 p-6">
-          <p className="text-sm font-bold text-[#1a2a4a] mb-5">Product Details</p>
+          <p className="text-sm font-bold text-[#1a2a4a] mb-5">Plan Details</p>
 
           <div className="flex flex-col gap-4">
 
-            {/* Row 1 — Product Name + Status */}
+            {/* Row 1 — Plan Name + Status */}
             <div className="grid grid-cols-2 gap-4">
               <Input
-                label="Product Name" name="productName" required
-                value={form.productName}
-                onChange={(v: string) => patch("productName", v)}
-                error={errors.productName}
+                label="Plan Name" name="planName" required
+                value={form.planName}
+                onChange={(v: string) => patch("planName", v)}
+                error={errors.planName}
               />
               <SelectField
                 label="Status" name="status" required
@@ -245,8 +252,8 @@ const EditProductScreen = () => {
               />
             </div>
 
-            {/* Row 3 — Min Amount + Max Amount */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* Row 3 — Min Amount + Max Amount + Profit Rate */}
+            <div className="grid grid-cols-3 gap-4">
               <Input
                 label="Minimum Amount" name="minimumAmount" type="number" required
                 value={form.minimumAmount}
@@ -258,6 +265,12 @@ const EditProductScreen = () => {
                 value={form.maximumAmount}
                 onChange={(v: string) => patch("maximumAmount", v)}
                 error={errors.maximumAmount}
+              />
+              <Input
+                label="Profit Rate (%)" name="profitRate" type="number" required
+                value={form.profitRate}
+                onChange={(v: string) => patch("profitRate", v)}
+                error={errors.profitRate}
               />
             </div>
 
@@ -305,4 +318,4 @@ const EditProductScreen = () => {
   );
 };
 
-export default EditProductScreen;
+export default EditPaymentPlanScreen;

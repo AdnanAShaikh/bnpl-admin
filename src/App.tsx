@@ -5,7 +5,7 @@ import UsersListingScreen from "./screens/Users/UsersListingScreen";
 import RolesListingScreen from "./screens/Roles/RolesListingScreen";
 import MerchantsListingScreen from "./screens/Merchants/MerchantsListingScreen";
 import BuyersListingScreen from "./screens/Buyers/BuyersListingScreen";
-import ProductsListingScreen from "./screens/Products/ProductsListingScreen";
+import PaymentPlanListingScreen from "./screens/PaymentPlan/PaymentPlanListingScreen";
 import OrdersListingScreen from "./screens/Orders/OrdersListingScreen";
 import CreateNewBuyerScreen from "./screens/Buyers/CreateNewBuyerScreen";
 import ViewBuyerScreen from "./screens/Buyers/ViewBuyerScreen";
@@ -17,9 +17,9 @@ import CreateNewRoleScreen from "./screens/Roles/CreateNewRoleScreen";
 import EditRoleScreen from "./screens/Roles/EditRoleScreen";
 import CreateUserScreen from "./screens/Users/CreateUserScreen";
 import EditUserScreen from "./screens/Users/EditUserScreen";
-import CreateNewProductScreen from "./screens/Products/CreateNewProductScreen";
-import EditProductScreen from "./screens/Products/EditProductScreen";
-import ViewProductScreen from "./screens/Products/ViewProductScreen";
+import CreateNewPaymentPlanScreen from "./screens/PaymentPlan/CreateNewPaymentPlanScreen";
+import EditPaymentPlanScreen from "./screens/PaymentPlan/EditPaymentPlanScreen";
+import ViewPaymentPlanScreen from "./screens/PaymentPlan/ViewPaymentPlanScreen";
 import NotFoundScreen from "./screens/NotFoundScreen";
 import { useAppDispatch, useAppSelector } from "./store/hooks";
 import { logoutAdmin, selectAuthUser, setAuthUser } from "./store/slices/adminSlice";
@@ -27,6 +27,7 @@ import { useEffect, useRef } from "react";
 import { toast } from "react-toastify";
 import ForgotPassword from "./screens/ForgotPassword";
 import { apiFetch } from "./utils/apiFetch";
+import EditOrderScreen from "./screens/Orders/EditOrderScreen";
 
 // ─── Permission Guard ─────────────────────────────────────────────────────────
 // Wraps a route element and redirects to 404 if the user lacks the required permission.
@@ -160,12 +161,13 @@ useEffect(() => {
           {/* Dashboard & Orders — accessible to all authenticated users */}
           <Route path="/admin/dashboard" element={<DashboardScreen />} />
           <Route path="/admin/orders"    element={<OrdersListingScreen />} />
+          <Route path="/admin/orders/:id"    element={<EditOrderScreen />} />
 
           {/* ── Products ── */}
-          <Route path="/admin/product/all"      element={<ProductsListingScreen />} />
-          <Route path="/admin/product/new"      element={<PermissionRoute permission="products.create" element={<CreateNewProductScreen />} />} />
-          <Route path="/admin/product/view/:id" element={<PermissionRoute permission="products.view"   element={<ViewProductScreen />} />} />
-          <Route path="/admin/product/edit/:id" element={<PermissionRoute permission="products.edit"   element={<EditProductScreen />} />} />
+          <Route path="/admin/payment-plan/all"      element={<PaymentPlanListingScreen />} />
+          <Route path="/admin/payment-plan/new"      element={<PermissionRoute permission="products.create" element={<CreateNewPaymentPlanScreen />} />} />
+          <Route path="/admin/payment-plan/view/:id" element={<PermissionRoute permission="products.view"   element={<ViewPaymentPlanScreen />} />} />
+          <Route path="/admin/payment-plan/edit/:id" element={<PermissionRoute permission="products.edit"   element={<EditPaymentPlanScreen />} />} />
 
           {/* ── Admin Users ── */}
           <Route path="/admin/user/all"         element={<UsersListingScreen />} />
