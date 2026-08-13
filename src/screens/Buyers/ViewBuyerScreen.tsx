@@ -129,6 +129,35 @@ const DocumentsTab = ({ documents }: { documents: any[] }) => {
   );
 };
 
+// ─── Tab 5: Payment Plans ─────────────────────────────────────────────────────
+const PaymentPlansTab = ({ plans }: { plans: any[] }) => {
+  if (!plans || plans.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <p className="text-sm text-gray-400">No payment plans assigned.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="grid grid-cols-3 gap-3">
+      {plans.map((plan: any) => (
+        <div
+          key={plan.id}
+          className="border-2 border-[#1a2a4a] bg-[#1a2a4a]/[0.03] rounded-xl px-4 py-3"
+        >
+          <p className="text-sm font-bold text-[#1a2a4a]">{plan.planName}</p>
+          {plan.termValue != null && (
+            <p className="text-xs text-gray-400 mt-0.5">
+              {plan.termValue} × {plan.termType?.toLowerCase()}
+              {plan.profitRate != null && ` · ${(Number(plan.profitRate) * 100).toFixed(1)}% profit`}
+            </p>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+};
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 const ViewBuyerScreen = () => {
   const { id }     = useParams<{ id: string }>();
@@ -219,6 +248,7 @@ const ViewBuyerScreen = () => {
             <Tab label="Company Details"    value={1} />
             <Tab label="Power of Attorney"  value={2} />
             <Tab label="Documents"          value={3} />
+            <Tab label="Payment Plans"      value={4} />
           </Tabs>
         </div>
 
@@ -228,6 +258,7 @@ const ViewBuyerScreen = () => {
           {activeTab === 1 && <CompanyTab  company={buyer.companyDetails}      />}
           {activeTab === 2 && <AttorneyTab attorney={buyer.powerOfAttorney}    />}
           {activeTab === 3 && <DocumentsTab documents={buyer.documents}        />}
+          {activeTab === 4 && <PaymentPlansTab plans={buyer.eligiblePlans ?? []} />}
         </div>
       </div>
     </Sidebar>

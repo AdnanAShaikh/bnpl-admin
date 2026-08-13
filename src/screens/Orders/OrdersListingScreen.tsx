@@ -1,290 +1,313 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Sidebar from "../../components/Sidebar";
 import DataTable from "../../components/DataTable";
 import type { ColumnDef, RowAction } from "../../components/DataTable";
-import Select from "@mui/material/Select";
-import MenuItem from "@mui/material/MenuItem";
-import FormControl from "@mui/material/FormControl";
-import { PieChart, Pie, Tooltip, ResponsiveContainer } from "recharts";
+import { useNavigate } from "react-router-dom";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { PieChart, Pie, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import {
+  fetchAllOrders,
+  selectOrders,
+  selectOrdersLoading,
+  selectOrdersError,
+  type Order,        
+} from "../../store/slices/orderSlice";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-interface Order {
-  id: number;
-  orderId: number;
-  merchantId: number;
-  merchantCrNumber: number;
-  buyerId: number;
-  buyerCrNumber: number;
-  invoiceAmount: number;
-  paymentPlan: string;
-  "MDR %": string;
-  noOfInstallments: number;
-  installmentAmount: number;
-  totalOrderValue: number;
-  outstandingAmount: number;
-  orderStatus: string;
-  fulfillmentStatus: string;
-}
-
-// ─── Demo Data ────────────────────────────────────────────────────────────────
-const ALL_ORDERS: Order[] = [
-  { id: 1,  orderId: 10127, merchantId: 5,  merchantCrNumber: 312324, buyerId: 7,  buyerCrNumber: 432412, invoiceAmount: 12314, paymentPlan: "Pay in 2",  "MDR %": "MDR 10",                        noOfInstallments: 2,  installmentAmount: 6157, totalOrderValue: 12314, outstandingAmount: 0,     orderStatus: "Pending Approval", fulfillmentStatus: "Delivered" },
-  { id: 2,  orderId: 10128, merchantId: 3,  merchantCrNumber: 654321, buyerId: 8,  buyerCrNumber: 987654, invoiceAmount: 20000, paymentPlan: "Pay in 4",  "MDR %": "15% vat with 10% MDR Profile",  noOfInstallments: 4,  installmentAmount: 5000, totalOrderValue: 20000, outstandingAmount: 5000,  orderStatus: "Approved",         fulfillmentStatus: "-"         },
-  { id: 3,  orderId: 10129, merchantId: 2,  merchantCrNumber: 223344, buyerId: 9,  buyerCrNumber: 998877, invoiceAmount: 15000, paymentPlan: "Pay in 12", "MDR %": "Epiphany",                      noOfInstallments: 12, installmentAmount: 1250, totalOrderValue: 15000, outstandingAmount: 7500,  orderStatus: "Approved",         fulfillmentStatus: "Delivered" },
-  { id: 4,  orderId: 10130, merchantId: 6,  merchantCrNumber: 778899, buyerId: 10, buyerCrNumber: 112233, invoiceAmount: 8000,  paymentPlan: "Pay in 2",  "MDR %": "MDR 10",                        noOfInstallments: 2,  installmentAmount: 4000, totalOrderValue: 8000,  outstandingAmount: 4000,  orderStatus: "Suspended",        fulfillmentStatus: "-"         },
-  { id: 5,  orderId: 10131, merchantId: 1,  merchantCrNumber: 445566, buyerId: 11, buyerCrNumber: 665544, invoiceAmount: 50000, paymentPlan: "Pay in 4",  "MDR %": "15% vat with 10% MDR Profile",  noOfInstallments: 4,  installmentAmount: 12500,totalOrderValue: 50000, outstandingAmount: 25000, orderStatus: "Approved",         fulfillmentStatus: "Delivered" },
-  { id: 6,  orderId: 10132, merchantId: 4,  merchantCrNumber: 999888, buyerId: 12, buyerCrNumber: 777666, invoiceAmount: 12000, paymentPlan: "Pay in 2",  "MDR %": "Epiphany",                      noOfInstallments: 2,  installmentAmount: 6000, totalOrderValue: 12000, outstandingAmount: 0,     orderStatus: "Rejected",         fulfillmentStatus: "-"         },
-  { id: 7,  orderId: 10133, merchantId: 7,  merchantCrNumber: 123789, buyerId: 13, buyerCrNumber: 321987, invoiceAmount: 30000, paymentPlan: "Pay in 12", "MDR %": "MDR 10",                        noOfInstallments: 12, installmentAmount: 2500, totalOrderValue: 30000, outstandingAmount: 15000, orderStatus: "Approved",         fulfillmentStatus: "Delivered" },
-  { id: 8,  orderId: 10134, merchantId: 8,  merchantCrNumber: 456123, buyerId: 14, buyerCrNumber: 654987, invoiceAmount: 7000,  paymentPlan: "Pay in 4",  "MDR %": "Epiphany",                      noOfInstallments: 4,  installmentAmount: 1750, totalOrderValue: 7000,  outstandingAmount: 3500,  orderStatus: "Pending Approval", fulfillmentStatus: "-"         },
-  { id: 9,  orderId: 10135, merchantId: 9,  merchantCrNumber: 852741, buyerId: 15, buyerCrNumber: 147258, invoiceAmount: 9000,  paymentPlan: "Pay in 2",  "MDR %": "15% vat with 10% MDR Profile",  noOfInstallments: 2,  installmentAmount: 4500, totalOrderValue: 9000,  outstandingAmount: 0,     orderStatus: "Approved",         fulfillmentStatus: "Delivered" },
-  { id: 10, orderId: 10136, merchantId: 10, merchantCrNumber: 369258, buyerId: 16, buyerCrNumber: 258369, invoiceAmount: 25000, paymentPlan: "Pay in 12", "MDR %": "MDR 10",                        noOfInstallments: 12, installmentAmount: 2083, totalOrderValue: 25000, outstandingAmount: 20000, orderStatus: "Suspended",        fulfillmentStatus: "-"         },
-];
-
-// ─── Summary Stats (derived from demo data) ───────────────────────────────────
-const totalActiveAmount = ALL_ORDERS.filter((o) => o.orderStatus === "Approved")
-  .reduce((s, o) => s + o.totalOrderValue, 0);
-const noOfActive = ALL_ORDERS.filter((o) => o.orderStatus === "Approved").length;
-
-const STATUS_BADGE: Record<string, string> = {
-  "In-Transit": "bg-[#1a2a4a]",
-  Returned:     "bg-[#1a2a4a]",
-  Disputed:     "bg-[#1a2a4a]",
-  Completed:    "bg-[#1a2a4a]",
-};
-
-const FULFILLMENT_COUNTS = {
-  "In-Transit": 0,
-  Returned:     0,
-  Disputed:     1,
-  Completed:    31,
-};
-
-// Donut chart data
-const PAID_PCT        = 60;
-const DISPUTED_PCT    = 15;
-const OUTSTANDING_PCT = 25;
-const DONUT_DATA = [
-  { name: "Paid Amount",        value: PAID_PCT,        fill: "#1a3a6a" },
-  { name: "Disputed Amount",    value: DISPUTED_PCT,    fill: "#e8a020" },
-  { name: "Outstanding Amount", value: OUTSTANDING_PCT, fill: "#E5E7EB" },
-];
-
-// ─── Order Summary Panel ──────────────────────────────────────────────────────
-const OrderSummaryPanel = () => (
-  <div className="bg-white rounded-2xl border border-gray-100 p-5 flex gap-6 flex-1">
-    {/* Left: totals */}
-    <div className="flex flex-col justify-center min-w-[180px]">
-      <p className="text-sm font-semibold text-gray-600 mb-3">Order Summary</p>
-      <p className="text-xs text-gray-400 mb-1">Total Active Orders Amount</p>
-      <p className="text-xl font-bold text-[#1a2a4a] mb-4">
-        SAR {totalActiveAmount.toLocaleString("en-SA", { minimumFractionDigits: 2 })}
-      </p>
-      <p className="text-xs text-gray-400 mb-1">No of Active Orders</p>
-      <p className="text-2xl font-bold text-[#1a2a4a]">{noOfActive}</p>
-    </div>
-
-    {/* Divider */}
-    <div className="w-px bg-gray-100 self-stretch" />
-
-    {/* Right: status grid */}
-    <div className="grid grid-cols-2 gap-3 flex-1">
-      {(Object.entries(FULFILLMENT_COUNTS) as [string, number][]).map(([label, count]) => (
-        <div key={label} className="border border-gray-100 rounded-xl px-4 py-3 flex items-center justify-between">
-          <div>
-            <p className="text-xl font-bold text-[#1a2a4a]">{count}</p>
-            <p className="text-xs text-gray-400 mt-0.5">Orders</p>
-          </div>
-          <span className={`text-xs font-bold text-white px-2.5 py-1 rounded-md ${STATUS_BADGE[label]}`}>
-            {label}
-          </span>
-        </div>
-      ))}
-    </div>
-  </div>
-);
-
-// ─── Custom Donut Label ───────────────────────────────────────────────────────
-const DonutLabel = ({ cx, cy }: { cx: number; cy: number }) => (
-  <>
-    <text x={cx} y={cy - 8} textAnchor="middle" className="fill-[#1a2a4a]" style={{ fontSize: 20, fontWeight: 700 }}>
-      {PAID_PCT}%
-    </text>
-    <text x={cx} y={cy + 12} textAnchor="middle" style={{ fontSize: 11, fill: "#9CA3AF" }}>
-      Credit Paid
-    </text>
-  </>
-);
-
-// ─── Payment Summary Panel ────────────────────────────────────────────────────
-const PaymentSummaryPanel = () => (
-  <div className="bg-white rounded-2xl border border-gray-100 p-5 w-[380px] flex-shrink-0">
-    <p className="text-sm font-semibold text-gray-600 mb-4">Order Payment Summary</p>
-    <div className="flex items-center gap-4">
-      {/* Donut */}
-      <div className="w-[160px] h-[160px] flex-shrink-0">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={DONUT_DATA}
-              cx="50%"
-              cy="50%"
-              innerRadius={52}
-              outerRadius={72}
-              dataKey="value"
-              startAngle={90}
-              endAngle={-270}
-              strokeWidth={0}
-              labelLine={false}
-              label={({ cx, cy }) => <DonutLabel cx={cx} cy={cy} />}
-              />
-            <Tooltip formatter={(v: any) => `${v ?? 0}%`} />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Legend + stats */}
-      <div className="flex flex-col gap-3 flex-1">
-        <div className="grid grid-cols-2 gap-x-6 gap-y-2 mb-1">
-          {[
-            { label: "Paid",        value: "60%" },
-            { label: "Disputed",    value: "15%" },
-            { label: "Outstanding", value: "25%" },
-          ].map((s) => (
-            <div key={s.label}>
-              <p className="text-xs text-gray-400">{s.label}</p>
-              <p className="text-sm font-bold text-[#1a2a4a]">{s.value}</p>
-            </div>
-          ))}
-        </div>
-        {DONUT_DATA.map((d) => (
-          <div key={d.name} className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: d.fill }} />
-            <span className="text-xs text-gray-500">{d.name}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  </div>
-);
-
-// ─── Column Definitions ───────────────────────────────────────────────────────
-const STATUS_STYLES: Record<string, string> = {
-  Approved:          "bg-teal-600",
-  Suspended:         "bg-gray-500",
-  Rejected:          "bg-red-500",
-  "Pending Approval":"bg-blue-500",
-};
-
-const COLUMNS: ColumnDef<Order>[] = [
-  { key: "orderId",             label: "Order ID"           },
-  { key: "merchantId",          label: "Merchant ID"        },
-  { key: "merchantCrNumber",    label: "Merchant CR No."    },
-  { key: "buyerId",             label: "Buyer ID"           },
-  { key: "buyerCrNumber",       label: "Buyer CR No."       },
-  { key: "invoiceAmount",       label: "Invoice Amount"     },
-  { key: "paymentPlan",         label: "Payment Plan"       },
-  { key: "MDR %",               label: "MDR %"              },
-  { key: "noOfInstallments",    label: "No. Installments"   },
-  { key: "installmentAmount",   label: "Installment Amt"    },
-  { key: "totalOrderValue",     label: "Total Order Value"  },
-  { key: "outstandingAmount",   label: "Outstanding Amt"    },
-  {
-    key: "orderStatus",
-    label: "Order Status",
-    render: (value) => {
-      const cls = STATUS_STYLES[String(value)] ?? "bg-gray-400";
-      return (
-        <span className={`inline-block text-xs font-bold px-3 py-1 rounded-md text-white ${cls}`}>
-          {String(value)}
-        </span>
-      );
-    },
-  },
-  {
-    key: "fulfillmentStatus",
-    label: "Fulfillment Status",
-    render: (value) => (
-      <span className={`inline-block text-xs font-bold px-3 py-1 rounded-md text-white ${value === "Delivered" ? "bg-green-500" : "bg-gray-300 text-gray-600"}`}>
-        {String(value)}
-      </span>
-    ),
-  },
-];
-
-// ─── Row Actions ──────────────────────────────────────────────────────────────
-const ROW_ACTIONS: RowAction<Order>[] = [
-  {
-    label: "View Order",
-    icon: (
-      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-      </svg>
-    ),
-    onClick: (order) => console.log("View order", order),
-  },
-];
-
-// ─── Currency options ─────────────────────────────────────────────────────────
-const CURRENCIES = ["SAR", "USD", "EUR", "AED", "GBP"];
 const NAVY = "#1a2a4a";
+
+// ─── Status display + meaning ─────────────────────────────────────────────────
+const STATUS_META: Record<string, { label: string; cls: string; dot: string; desc: string }> = {
+  PENDING_REVIEW: { label: "Pending Review", cls: "bg-amber-400 text-gray-800", dot: "bg-amber-400",   desc: "A buyer has submitted a financing request that has not yet been picked up for review." },
+  UNDER_REVIEW:   { label: "Under Review",   cls: "bg-blue-500",                dot: "bg-blue-500",    desc: "The order has been assigned to an admin and is being assessed." },
+  APPROVED:       { label: "Approved",       cls: "bg-teal-600",                dot: "bg-teal-600",    desc: "The request has been approved and is awaiting merchant fulfilment confirmation." },
+  ACTIVE:         { label: "Active",         cls: "bg-emerald-600",             dot: "bg-emerald-600", desc: "Financing is live — the merchant is being paid and buyer installments have begun." },
+  COMPLETED:      { label: "Completed",      cls: "bg-[#1a2a4a]",               dot: "bg-[#1a2a4a]",   desc: "All installments are settled and the order is closed." },
+  REJECTED:       { label: "Rejected",       cls: "bg-red-500",                 dot: "bg-red-500",     desc: "The request was declined — by an admin during review, or by the merchant." },
+  CANCELLED:      { label: "Cancelled",      cls: "bg-gray-500",                dot: "bg-gray-500",    desc: "The buyer cancelled the request before it became active." },
+  DEFAULTED:      { label: "Defaulted",      cls: "bg-red-700",                 dot: "bg-red-700",     desc: "The buyer has missed installments and the order is in default." },
+};
+
+const STATUS_FLOW = ["PENDING_REVIEW", "UNDER_REVIEW", "APPROVED", "ACTIVE", "COMPLETED", "REJECTED", "CANCELLED", "DEFAULTED"];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const money = (v: string | number, currency = "SAR") =>
+  `${currency} ${Number(v).toLocaleString("en-SA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+const dateFmt = (iso: string) =>
+  new Date(iso).toLocaleDateString("en-SA", { year: "numeric", month: "short", day: "numeric" });
+
+// ─── Status Info Modal ────────────────────────────────────────────────────────
+const StatusInfoModal = ({ open, onClose }: { open: boolean; onClose: () => void }) => {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      style={{ animation: "fadeIn .15s ease-out" }} onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden"
+        style={{ animation: "popIn .18s ease-out" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <h3 className="text-base font-bold text-[#1a2a4a]">Order Statuses Explained</h3>
+            <p className="text-xs text-gray-400 mt-0.5">The order workflow, stage by stage</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-5">
+          <div className="flex flex-col gap-4">
+            {STATUS_FLOW.map((key) => {
+              const meta = STATUS_META[key];
+              return (
+                <div key={key} className="flex gap-3">
+                  <span className={`w-3 h-3 rounded-full ${meta.dot} flex-shrink-0 mt-1`} />
+                  <div>
+                    <p className="text-sm font-bold text-[#1a2a4a]">{meta.label}</p>
+                    <p className="text-xs text-gray-400 leading-relaxed">{meta.desc}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <div className="flex items-center justify-end px-6 py-4 border-t border-gray-100">
+          <button onClick={onClose}
+            className="px-6 py-2 bg-[#1a2a4a] hover:bg-[#243a5e] text-white font-semibold text-sm rounded-xl transition-all">
+            Got it
+          </button>
+        </div>
+      </div>
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes popIn {
+          from { opacity: 0; transform: scale(0.96) translateY(8px); }
+          to   { opacity: 1; transform: scale(1) translateY(0); }
+        }
+      `}</style>
+    </div>
+  );
+};
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 const OrdersListingScreen = () => {
-  const [currency, setCurrency] = useState("SAR");
+  const dispatch = useAppDispatch();
+  const navigate = useNavigate();
+
+  const orders  = useAppSelector(selectOrders);
+  const loading = useAppSelector(selectOrdersLoading);
+  const error   = useAppSelector(selectOrdersError);
+
+  const [infoOpen, setInfoOpen] = useState(false);
+
+  useEffect(() => {
+    dispatch(fetchAllOrders());
+  }, [dispatch]);
+
+  // ── Summary stats ──
+  const stats = useMemo(() => {
+    const pending   = orders.filter((o: Order) => o.status === "PENDING_REVIEW");
+    const review    = orders.filter((o: Order) => o.status === "UNDER_REVIEW");
+    const active    = orders.filter((o: Order) => o.status === "ACTIVE");
+    const activeTotal = active.reduce((s: number, o: Order) => s + Number(o.totalAmount), 0);
+    return {
+      total:        orders.length,
+      pendingCount: pending.length,
+      reviewCount:  review.length,
+      activeCount:  active.length,
+      activeTotal,
+    };
+  }, [orders]);
+
+  // ── Donut: orders grouped by status ──
+  const donutData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    orders.forEach((o: Order) => { counts[o.status] = (counts[o.status] ?? 0) + 1; });
+    const fillOf: Record<string, string> = {
+      PENDING_REVIEW: "#f59e0b", UNDER_REVIEW: "#3b82f6", APPROVED: "#0d9488",
+      ACTIVE: "#059669", COMPLETED: "#1a3a6a", REJECTED: "#ef4444",
+      CANCELLED: "#6b7280", DEFAULTED: "#b91c1c",
+    };
+    return Object.entries(counts).map(([status, value]) => ({
+      name: STATUS_META[status]?.label ?? status,
+      value,
+      fill: fillOf[status] ?? "#E5E7EB",
+    }));
+  }, [orders]);
+
+  const totalOrders = orders.length;
+
+  // ── Columns ──
+  const COLUMNS: ColumnDef<Order>[] = [
+    { key: "id", label: "Order #", render: (v) => <span className="font-semibold text-[#1a2a4a]">#{String(v)}</span> },
+    { key: "product",  label: "Product",  render: (_v, row) => row.product?.name ?? "—" },
+    { key: "buyer",    label: "Buyer",    render: (_v, row) => row.buyer?.companyDetails?.companyName ?? "—" },
+    { key: "merchant", label: "Merchant", render: (_v, row) => row.merchant?.companyDetails?.companyName ?? "—" },
+    { key: "quantity", label: "Qty" },
+    { key: "totalAmount", label: "Total", render: (v, row) => money(v as string, row.currency) },
+    {
+      key: "installmentAmount",
+      label: "Installments",
+      render: (v, row) => (
+        <span>
+          {row.numberOfInstallments} × {money(v as string, row.currency)}
+        </span>
+      ),
+    },
+    {
+      key: "requestedPlan",
+      label: "Plan",
+      render: (_v, row) => row.requestedPlan?.planName ?? "—",
+    },
+    {
+      key: "assignedAdmin",
+      label: "Assigned To",
+      render: (_v, row) => row.assignedAdmin?.name ?? row.assignedAdmin?.email ?? <span className="text-gray-300">Unassigned</span>,
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (value) => {
+        const meta = STATUS_META[String(value)] ?? { label: String(value), cls: "bg-gray-400" };
+        return <span className={`inline-block text-xs font-bold px-3 py-1 rounded-md text-white ${meta.cls}`}>{meta.label}</span>;
+      },
+    },
+    { key: "createdAt", label: "Submitted", render: (v) => dateFmt(String(v)) },
+  ];
+
+  // ── Row actions ──
+  const eyeIcon = (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+    </svg>
+  );
+
+  const ROW_ACTIONS: RowAction<Order>[] = [
+    { label: "View / Manage", icon: eyeIcon, onClick: (order) => navigate(`/admin/orders/${order.id}`) },
+  ];
 
   return (
     <Sidebar>
-      <div className="mb-5">
+      {/* Header with info button */}
+      <div className="flex items-center justify-between mb-5">
         <h1 className="text-xl font-bold text-[#1a2a4a]">Orders</h1>
+        <button
+          onClick={() => setInfoOpen(true)}
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#1a2a4a] border border-gray-200 rounded-xl px-3.5 py-2 hover:border-[#1a2a4a] transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Status Guide
+        </button>
       </div>
 
-      {/* Currency selector */}
-      <div className="flex items-center gap-3 mb-5">
-        <span className="text-sm font-medium text-gray-600">Select Currency</span>
-        <FormControl size="small">
-          <Select
-            value={currency}
-            onChange={(e) => setCurrency(e.target.value)}
-            sx={{
-              minWidth: 160,
-              borderRadius: "10px",
-              fontFamily: "inherit",
-              fontSize: "14px",
-              "& .MuiOutlinedInput-notchedOutline": { borderColor: "#E5E7EB" },
-              "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: NAVY },
-              "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: NAVY },
-            }}
-          >
-            {CURRENCIES.map((c) => (
-              <MenuItem key={c} value={c} sx={{ fontFamily: "inherit", fontSize: "14px" }}>
-                {c}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      </div>
-
-      {/* Summary panels */}
+      {/* Summary + donut */}
       <div className="flex gap-5 mb-6">
-        <OrderSummaryPanel />
-        <PaymentSummaryPanel />
+        <div className="grid grid-cols-2 gap-4 flex-1">
+          <div className="bg-white rounded-2xl border border-gray-100 p-5">
+            <p className="text-xs text-gray-400 mb-1">Active Orders Value</p>
+            <p className="text-lg font-bold text-[#1a2a4a]">
+              SAR {stats.activeTotal.toLocaleString("en-SA", { minimumFractionDigits: 2 })}
+            </p>
+          </div>
+          <div className="bg-white rounded-2xl border border-gray-100 p-5">
+            <p className="text-xs text-gray-400 mb-1">Pending Review</p>
+            <p className="text-2xl font-bold text-[#1a2a4a]">{stats.pendingCount}</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-gray-100 p-5">
+            <p className="text-xs text-gray-400 mb-1">Under Review</p>
+            <p className="text-2xl font-bold text-[#1a2a4a]">{stats.reviewCount}</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-gray-100 p-5">
+            <p className="text-xs text-gray-400 mb-1">Active</p>
+            <p className="text-2xl font-bold text-[#1a2a4a]">{stats.activeCount}</p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-100 p-5 w-[380px] flex-shrink-0">
+          <p className="text-sm font-semibold text-gray-600 mb-4">Orders by Status</p>
+          {totalOrders === 0 ? (
+            <div className="h-[160px] flex items-center justify-center">
+              <p className="text-sm text-gray-400">No orders yet.</p>
+            </div>
+          ) : (
+            <div className="flex items-center gap-4">
+              <div className="w-[160px] h-[160px] flex-shrink-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={donutData} cx="50%" cy="50%"
+                      innerRadius={52} outerRadius={72} dataKey="value"
+                      startAngle={90} endAngle={-270} strokeWidth={0} labelLine={false}
+                      label={({ cx, cy }: any) => (
+                        <>
+                          <text x={cx} y={cy - 6} textAnchor="middle" style={{ fontSize: 22, fontWeight: 700, fill: NAVY }}>
+                            {totalOrders}
+                          </text>
+                          <text x={cx} y={cy + 13} textAnchor="middle" style={{ fontSize: 11, fill: "#9CA3AF" }}>
+                            Orders
+                          </text>
+                        </>
+                      )}
+                    >
+                      {donutData.map((d, i) => <Cell key={i} fill={d.fill} />)}
+                    </Pie>
+                    <Tooltip formatter={(v: any, n: any) => [`${v} order${v === 1 ? "" : "s"}`, n]} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex flex-col gap-2 flex-1">
+                {donutData.map((d) => (
+                  <div key={d.name} className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: d.fill }} />
+                    <span className="text-xs text-gray-500 flex-1">{d.name}</span>
+                    <span className="text-xs font-bold text-[#1a2a4a]">{d.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Table */}
-      <DataTable<Order>
-        title="All Orders"
-        columns={COLUMNS}
-        dataSource={ALL_ORDERS}
-        rowActions={ROW_ACTIONS}
-        searchable
-        searchKeys={["orderId", "merchantCrNumber", "buyerId", "buyerCrNumber", "paymentPlan", "orderStatus", "fulfillmentStatus"]}
-        showStatusFilter
-        statusOptions={["Pending Approval", "Approved", "Rejected", "Suspended", "All Status"]}
-        defaultStatus="All Status"
-        defaultPageSize={10}
-      />
+      {/* States */}
+      {loading && (
+        <div className="bg-white rounded-2xl border border-gray-100 p-16 flex items-center justify-center">
+          <span className="w-6 h-6 border-2 border-gray-200 border-t-[#1a2a4a] rounded-full animate-spin" />
+          <span className="ml-3 text-sm text-gray-400">Loading orders…</span>
+        </div>
+      )}
+
+      {error && !loading && (
+        <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center">
+          <p className="text-sm font-semibold text-[#1a2a4a] mb-1">Couldn't load orders</p>
+          <p className="text-sm text-gray-400 mb-4">{error}</p>
+          <button onClick={() => dispatch(fetchAllOrders())}
+            className="px-4 py-2 rounded-xl text-sm font-semibold bg-[#1a2a4a] text-white hover:bg-[#243a5e] transition-colors">
+            Try again
+          </button>
+        </div>
+      )}
+
+      {!loading && !error && (
+        <DataTable<Order>
+          title="All Orders"
+          columns={COLUMNS}
+          dataSource={orders}
+          rowActions={ROW_ACTIONS}
+          searchable
+          searchKeys={["id", "orderRef", "status"]}
+          showStatusFilter
+          statusOptions={["PENDING_REVIEW", "UNDER_REVIEW", "APPROVED", "ACTIVE", "COMPLETED", "REJECTED", "CANCELLED", "DEFAULTED", "All Status"]}
+          defaultStatus="All Status"
+          defaultPageSize={10}
+        />
+      )}
+
+      <StatusInfoModal open={infoOpen} onClose={() => setInfoOpen(false)} />
     </Sidebar>
   );
 };
