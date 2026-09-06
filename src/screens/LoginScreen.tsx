@@ -592,7 +592,7 @@ const LoginScreen = () => {
         <div className="flex items-center gap-2">
           <div className="relative w-10 h-10 flex-shrink-0">
             <div className="w-10 h-10 bg-[#1a3a6a] rounded-sm flex items-center justify-center">
-              <span className="text-white font-black text-lg leading-none">A</span>
+              <span className="text-white font-black text-lg leading-none">R</span>
             </div>
             <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-[#e8a020] rounded-sm" />
           </div>
