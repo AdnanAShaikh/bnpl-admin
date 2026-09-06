@@ -598,7 +598,7 @@ const LoginScreen = () => {
           </div>
           <div className="flex flex-col leading-tight">
             <span className="font-black text-sm tracking-widest" style={{ color: "#e8a020" }}>
-              Adnan <span className="text-[#1a3a6a]">TRADING</span>
+              RUFAAD <span className="text-[#1a3a6a]">Trading</span>
             </span>
             <span className="text-[11px] text-gray-500 tracking-wide" style={{ fontFamily: "serif" }}>
               Invest In Future.
@@ -701,7 +701,7 @@ const LoginScreen = () => {
         </div>
       </div>
 
-      <p className="text-center text-sm text-white/40 pb-6">©2026 Powered by Rufaad</p>
+      <p className="text-center text-sm text-white/40 pb-6">©2026 Powered by RUFAAD</p>
     </div>
   );
 };

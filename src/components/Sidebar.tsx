@@ -212,7 +212,7 @@ const Sidebar = ({ children }: SidebarProps) => {
             </div>
             <div className="flex flex-col leading-tight">
               <span className="font-black text-xs tracking-widest text-secondary">
-                RUFAAD <span className="text-white">Inc.</span>
+                RUFAAD <span className="text-white">Trading</span>
               </span>
               <span className="text-[10px] text-white/50 tracking-wide" style={{ fontFamily: "serif" }}>
                 Invest In Future.
