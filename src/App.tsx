@@ -1,4 +1,10 @@
-import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
+import {
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import LoginScreen from "./screens/LoginScreen";
 import DashboardScreen from "./screens/DashboardScreen";
 import UsersListingScreen from "./screens/Users/UsersListingScreen";
@@ -22,8 +28,12 @@ import EditPaymentPlanScreen from "./screens/PaymentPlan/EditPaymentPlanScreen";
 import ViewPaymentPlanScreen from "./screens/PaymentPlan/ViewPaymentPlanScreen";
 import NotFoundScreen from "./screens/NotFoundScreen";
 import { useAppDispatch, useAppSelector } from "./store/hooks";
-import { logoutAdmin, selectAuthUser, setAuthUser } from "./store/slices/adminSlice";
-import { useEffect, useRef } from "react";
+import {
+  logoutAdmin,
+  selectAuthUser,
+  setAuthUser,
+} from "./store/slices/adminSlice";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import ForgotPassword from "./screens/ForgotPassword";
 import { apiFetch } from "./utils/apiFetch";
@@ -39,13 +49,14 @@ interface PermissionRouteProps {
 }
 
 const PermissionRoute = ({ element, permission }: PermissionRouteProps) => {
-  const authUser  = useAppSelector(selectAuthUser);
-  const navigate  = useNavigate();
-  const toasted   = useRef(false); // prevent double-toast in StrictMode
- 
-  const isSuperAdmin  = authUser?.accessRole?.roleName === "Super Admin";
-  const hasPermission = isSuperAdmin || (authUser?.accessRole?.permissions[permission] === true);
- 
+  const authUser = useAppSelector(selectAuthUser);
+  const navigate = useNavigate();
+  const toasted = useRef(false); // prevent double-toast in StrictMode
+
+  const isSuperAdmin = authUser?.accessRole?.roleName === "Super Admin";
+  const hasPermission =
+    isSuperAdmin || authUser?.accessRole?.permissions[permission] === true;
+
   useEffect(() => {
     if (!hasPermission && !toasted.current) {
       toasted.current = true;
@@ -53,10 +64,10 @@ const PermissionRoute = ({ element, permission }: PermissionRouteProps) => {
       navigate(-1);
     }
   }, [hasPermission, navigate]);
- 
+
   // Render nothing while the effect fires (avoids a flash of the protected screen)
   if (!hasPermission) return null;
- 
+
   return element;
 };
 
@@ -65,92 +76,52 @@ function App() {
   const authUser = useAppSelector(selectAuthUser);
   const location = useLocation();
   const dispatch = useAppDispatch();
+  const [booting, setBooting] = useState(true);
 
-useEffect(() => {
+  useEffect(() => {
+    const boot = async () => {
+      try {
+        const res = await apiFetch("/api/auth/verify/adminToken");
 
-  if (!authUser) return;
-
-  const verify = async () => {
-
-    try {
-
-      // ─────────────────────────────────────────
-      // VERIFY ACCESS TOKEN
-      // ─────────────────────────────────────────
-
-      let res = await apiFetch(
-        "/api/auth/verify/adminToken",
-      );
-
-      // ─────────────────────────────────────────
-      // ACCESS TOKEN EXPIRED
-      // ─────────────────────────────────────────
-
-      if (res.status === 401) {
-
-        // try refresh
-        const refreshRes = await apiFetch(
-          "/api/auth/refresh/adminToken",
-        );
-
-        // refresh failed
-        if (!refreshRes.ok) {
+        if (res.ok) {
+          const data = await res.json();
+          dispatch(setAuthUser(data.user));
+        } else {
           dispatch(logoutAdmin());
-
-          toast.error(
-            "Session expired. Please login again"
-          );
-
-          return;
         }
-
-        // retry verify after refresh
-        res = await apiFetch(
-          "/api/auth/verify/adminToken",
-        );
-      }
-
-      // ─────────────────────────────────────────
-      // VERIFIED
-      // ─────────────────────────────────────────
-
-      if (res.ok) {
-
-        const data = await res.json();
-
-        dispatch(
-          setAuthUser(data.user)
-        );
-
-      } else {
-
+      } catch {
         dispatch(logoutAdmin());
-
-        toast.error(
-          "Session expired. Please login again."
-        );
+      } finally {
+        setBooting(false);
       }
+    };
 
-    } catch (error) {
+    boot();
+  }, []); // run once on mount
 
-      dispatch(logoutAdmin());
-
-      toast.error(
-        "System crashed. Please login again."
-      );
-    }
-  };
-
-  verify();
-
-}, [location.pathname]);
+  if (booting) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f0f2f5]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-3 border-[#1a2a4a] border-t-transparent rounded-full animate-spin" />
+          <p className="text-gray-400 text-sm">Authenticating…</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Routes>
       {/* ── / → dashboard if logged in, login if not ── */}
       <Route
         path="/"
-        element={authUser ? <Navigate to="/admin/dashboard" replace /> : <LoginScreen />}
+        element={
+          authUser ? (
+            <Navigate to="/admin/dashboard" replace />
+          ) : (
+            <LoginScreen />
+          )
+        }
       />
 
       <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -160,36 +131,146 @@ useEffect(() => {
         <>
           {/* Dashboard & Orders — accessible to all authenticated users */}
           <Route path="/admin/dashboard" element={<DashboardScreen />} />
-          <Route path="/admin/orders"    element={<OrdersListingScreen />} />
-          <Route path="/admin/orders/:id"    element={<EditOrderScreen />} />
+          <Route path="/admin/orders" element={<OrdersListingScreen />} />
+          <Route path="/admin/orders/:id" element={<EditOrderScreen />} />
 
           {/* ── Products ── */}
-          <Route path="/admin/payment-plan/all"      element={<PaymentPlanListingScreen />} />
-          <Route path="/admin/payment-plan/new"      element={<PermissionRoute permission="products.create" element={<CreateNewPaymentPlanScreen />} />} />
-          <Route path="/admin/payment-plan/view/:id" element={<PermissionRoute permission="products.view"   element={<ViewPaymentPlanScreen />} />} />
-          <Route path="/admin/payment-plan/edit/:id" element={<PermissionRoute permission="products.edit"   element={<EditPaymentPlanScreen />} />} />
+          <Route
+            path="/admin/payment-plan/all"
+            element={<PaymentPlanListingScreen />}
+          />
+          <Route
+            path="/admin/payment-plan/new"
+            element={
+              <PermissionRoute
+                permission="products.create"
+                element={<CreateNewPaymentPlanScreen />}
+              />
+            }
+          />
+          <Route
+            path="/admin/payment-plan/view/:id"
+            element={
+              <PermissionRoute
+                permission="products.view"
+                element={<ViewPaymentPlanScreen />}
+              />
+            }
+          />
+          <Route
+            path="/admin/payment-plan/edit/:id"
+            element={
+              <PermissionRoute
+                permission="products.edit"
+                element={<EditPaymentPlanScreen />}
+              />
+            }
+          />
 
           {/* ── Admin Users ── */}
-          <Route path="/admin/user/all"         element={<UsersListingScreen />} />
-          <Route path="/admin/user/new"         element={<PermissionRoute permission="user.create" element={<CreateUserScreen />} />} />
-          <Route path="/admin/user/edit/:id"    element={<PermissionRoute permission="user.edit"   element={<EditUserScreen />} />} />
+          <Route path="/admin/user/all" element={<UsersListingScreen />} />
+          <Route
+            path="/admin/user/new"
+            element={
+              <PermissionRoute
+                permission="user.create"
+                element={<CreateUserScreen />}
+              />
+            }
+          />
+          <Route
+            path="/admin/user/edit/:id"
+            element={
+              <PermissionRoute
+                permission="user.edit"
+                element={<EditUserScreen />}
+              />
+            }
+          />
 
           {/* ── Roles ── */}
-          <Route path="/admin/role/all"         element={<RolesListingScreen />} />
-          <Route path="/admin/role/new"         element={<PermissionRoute permission="roles.create" element={<CreateNewRoleScreen />} />} />
-          <Route path="/admin/role/edit/:id"    element={<PermissionRoute permission="roles.edit"   element={<EditRoleScreen />} />} />
+          <Route path="/admin/role/all" element={<RolesListingScreen />} />
+          <Route
+            path="/admin/role/new"
+            element={
+              <PermissionRoute
+                permission="roles.create"
+                element={<CreateNewRoleScreen />}
+              />
+            }
+          />
+          <Route
+            path="/admin/role/edit/:id"
+            element={
+              <PermissionRoute
+                permission="roles.edit"
+                element={<EditRoleScreen />}
+              />
+            }
+          />
 
           {/* ── Buyers ── */}
-          <Route path="/admin/buyer/all"        element={<BuyersListingScreen />} />
-          <Route path="/admin/buyer/new"        element={<PermissionRoute permission="buyer.create" element={<CreateNewBuyerScreen />} />} />
-          <Route path="/admin/buyer/:id"        element={<PermissionRoute permission="buyer.view"   element={<ViewBuyerScreen />} />} />
-          <Route path="/admin/buyer/edit/:id"   element={<PermissionRoute permission="buyer.edit"   element={<EditBuyerScreen />} />} />
+          <Route path="/admin/buyer/all" element={<BuyersListingScreen />} />
+          <Route
+            path="/admin/buyer/new"
+            element={
+              <PermissionRoute
+                permission="buyer.create"
+                element={<CreateNewBuyerScreen />}
+              />
+            }
+          />
+          <Route
+            path="/admin/buyer/:id"
+            element={
+              <PermissionRoute
+                permission="buyer.view"
+                element={<ViewBuyerScreen />}
+              />
+            }
+          />
+          <Route
+            path="/admin/buyer/edit/:id"
+            element={
+              <PermissionRoute
+                permission="buyer.edit"
+                element={<EditBuyerScreen />}
+              />
+            }
+          />
 
           {/* ── Merchants ── */}
-          <Route path="/admin/merchant/all"        element={<MerchantsListingScreen />}  />
-          <Route path="/admin/merchant/new"        element={<PermissionRoute permission="merchant.create" element={<CreateNewMerchantScreen />} />} />
-          <Route path="/admin/merchant/:id"        element={<PermissionRoute permission="merchant.view"   element={<ViewMerchantScreen />} />} />
-          <Route path="/admin/merchant/edit/:id"   element={<PermissionRoute permission="merchant.edit"   element={<EditMerchantScreen />} />} />
+          <Route
+            path="/admin/merchant/all"
+            element={<MerchantsListingScreen />}
+          />
+          <Route
+            path="/admin/merchant/new"
+            element={
+              <PermissionRoute
+                permission="merchant.create"
+                element={<CreateNewMerchantScreen />}
+              />
+            }
+          />
+          <Route
+            path="/admin/merchant/:id"
+            element={
+              <PermissionRoute
+                permission="merchant.view"
+                element={<ViewMerchantScreen />}
+              />
+            }
+          />
+          <Route
+            path="/admin/merchant/edit/:id"
+            element={
+              <PermissionRoute
+                permission="merchant.edit"
+                element={<EditMerchantScreen />}
+              />
+            }
+          />
         </>
       ) : (
         <Route path="/admin/*" element={<Navigate to="/" replace />} />
