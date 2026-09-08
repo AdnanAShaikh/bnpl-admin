@@ -1,10 +1,4 @@
-import {
-  Routes,
-  Route,
-  Navigate,
-  useLocation,
-  useNavigate,
-} from "react-router-dom";
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import LoginScreen from "./screens/LoginScreen";
 import DashboardScreen from "./screens/DashboardScreen";
 import UsersListingScreen from "./screens/Users/UsersListingScreen";
@@ -74,7 +68,6 @@ const PermissionRoute = ({ element, permission }: PermissionRouteProps) => {
 // ─── App ──────────────────────────────────────────────────────────────────────
 function App() {
   const authUser = useAppSelector(selectAuthUser);
-  const location = useLocation();
   const dispatch = useAppDispatch();
   const [booting, setBooting] = useState(true);
 
