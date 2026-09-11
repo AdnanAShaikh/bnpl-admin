@@ -1,4 +1,10 @@
-import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import {
+  Routes,
+  Route,
+  Navigate,
+  useNavigate,
+  useLocation,
+} from "react-router-dom";
 import LoginScreen from "./screens/LoginScreen";
 import DashboardScreen from "./screens/DashboardScreen";
 import UsersListingScreen from "./screens/Users/UsersListingScreen";
@@ -70,6 +76,7 @@ function App() {
   const authUser = useAppSelector(selectAuthUser);
   const dispatch = useAppDispatch();
   const [booting, setBooting] = useState(true);
+  const location = useLocation();
 
   useEffect(() => {
     const boot = async () => {
@@ -92,7 +99,7 @@ function App() {
     boot();
   }, []); // run once on mount
 
-  if (booting) {
+  if (booting && location.pathname !== "/") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f0f2f5]">
         <div className="flex flex-col items-center gap-3">

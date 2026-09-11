@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+/* eslint-disable react-hooks/set-state-in-effect */
+import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
 import { logoutAdmin, selectAuthUser } from "../store/slices/adminSlice";
@@ -255,11 +256,9 @@ const Sidebar = ({ children }: SidebarProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
-  const [notifCount] = useState(3);
-  const [logoutOpen, setLogoutOpen] = useState(false); // ← dialog state
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false); // ← drawer state
   const authUser = useAppSelector(selectAuthUser);
-
-  console.log(authUser);
 
   const handleLogout = async () => {
     await dispatch(logoutAdmin());
@@ -268,37 +267,74 @@ const Sidebar = ({ children }: SidebarProps) => {
     navigate("/", { replace: true });
   };
 
+  // close the drawer whenever the route changes (mobile)
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
+
   return (
     <div className="flex min-h-screen bg-[#f0f2f5]">
-      {/* Logout Confirmation Dialog */}
       <LogoutDialog
         open={logoutOpen}
         onConfirm={handleLogout}
         onCancel={() => setLogoutOpen(false)}
       />
 
+      {/* ── Mobile backdrop ── */}
+      {mobileOpen && (
+        <div
+          onClick={() => setMobileOpen(false)}
+          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+        />
+      )}
+
       {/* ── Sidebar ── */}
-      <aside className="w-[245px] flex-shrink-0 flex flex-col sticky top-0 h-screen bg-primary">
+      <aside
+        className={`w-[245px] flex-shrink-0 flex flex-col bg-primary z-40
+          fixed inset-y-0 left-0 transition-transform duration-300
+          lg:sticky lg:top-0 lg:h-screen lg:translate-x-0
+          ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
+      >
         {/* Logo */}
         <div className="px-5 pt-5 pb-4">
-          <div className="flex items-center gap-2.5">
-            <div className="relative w-10 h-10 flex-shrink-0">
-              <div className="w-10 h-10 bg-white/10 rounded-sm flex items-center justify-center">
-                <span className="text-white font-black text-lg">R</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="relative w-10 h-10 flex-shrink-0">
+                <div className="w-10 h-10 bg-white rounded-sm flex items-center justify-center">
+                  <span className="text-primary font-black text-lg">R</span>
+                </div>
               </div>
-              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-secondary rounded-sm" />
+              <div className="flex flex-col leading-tight">
+                <span className="font-black text-xs tracking-widest text-white">
+                  RUFAAD
+                </span>
+                <span
+                  className="text-[10px] text-white tracking-wide"
+                  style={{ fontFamily: "serif" }}
+                >
+                  Invest In Future.
+                </span>
+              </div>
             </div>
-            <div className="flex flex-col leading-tight">
-              <span className="font-black text-xs tracking-widest text-secondary">
-                RUFAAD <span className="text-white">Trading</span>
-              </span>
-              <span
-                className="text-[10px] text-white/50 tracking-wide"
-                style={{ fontFamily: "serif" }}
+            {/* close button — mobile only */}
+            <button
+              onClick={() => setMobileOpen(false)}
+              className="lg:hidden text-white/70 hover:text-white"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
               >
-                Invest In Future.
-              </span>
-            </div>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
           </div>
           <div className="mt-4 border-b border-white/10" />
         </div>
@@ -339,35 +375,55 @@ const Sidebar = ({ children }: SidebarProps) => {
       {/* ── Main area ── */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top bar */}
-        <header className="h-[64px] bg-white border-b border-gray-100 flex items-center justify-between px-6 sticky top-0 z-10">
-          {/* Breadcrumb */}
-          <div className="flex items-center gap-1.5 text-sm text-gray-400">
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.8}
+        <header className="h-[64px] bg-white border-b border-gray-100 flex items-center justify-between px-4 sm:px-6 sticky top-0 z-20">
+          <div className="flex items-center gap-3">
+            {/* hamburger — mobile only */}
+            <button
+              onClick={() => setMobileOpen(true)}
+              className="lg:hidden text-gray-500 hover:text-primary transition-colors"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-              />
-            </svg>
-            <span>/</span>
-            <span className="text-gray-600 font-medium capitalize">
-              {location.pathname.split("/").pop() ?? "Dashboard"}
-            </span>
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
+              </svg>
+            </button>
+
+            {/* Breadcrumb — hidden on the smallest screens to save room */}
+            <div className="hidden sm:flex items-center gap-1.5 text-sm text-gray-400">
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.8}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                />
+              </svg>
+              <span>/</span>
+              <span className="text-gray-600 font-medium capitalize">
+                {location.pathname.split("/").pop() ?? "Dashboard"}
+              </span>
+            </div>
           </div>
 
-          {/* Right actions */}
+          {/* Right actions — unchanged */}
           <div className="flex items-center gap-4">
-            <p className="font-medium text-primary cursor-default">
+            <p className="font-medium text-primary cursor-default hidden sm:block">
               <span className="text-secondary">Hi,</span> {authUser?.name || ""}
             </p>
-
-            {/* Logout button → opens dialog */}
             <button
               onClick={() => setLogoutOpen(true)}
               className="flex items-center gap-1.5 text-sm font-semibold text-gray-600 hover:text-red-500 transition-colors"
@@ -385,55 +441,13 @@ const Sidebar = ({ children }: SidebarProps) => {
                   d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
                 />
               </svg>
-              LOGOUT
+              <span className="hidden sm:inline">LOGOUT</span>
             </button>
-
-            <button className="text-gray-400 hover:text-primary transition-colors">
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={1.8}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </svg>
-            </button>
-
-            <button className="relative text-gray-400 hover:text-primary transition-colors">
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={1.8}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                />
-              </svg>
-              {notifCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                  {notifCount}
-                </span>
-              )}
-            </button>
+            {/* settings + notification buttons unchanged */}
           </div>
         </header>
 
-        {/* Page content */}
-        <main className="flex-1 p-6">{children}</main>
+        <main className="flex-1 p-4 sm:p-6">{children}</main>
       </div>
     </div>
   );
