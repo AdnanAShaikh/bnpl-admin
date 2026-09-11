@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Sidebar from "../../components/Sidebar";
 import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
@@ -11,8 +11,9 @@ import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import {
   deleteDocument,
   fetchAllBuyers,
-  selectBuyers,
+  fetchBuyerById,
   updateBuyer,
+  type BuyerDetail,
 } from "../../store/slices/adminSlice";
 import { toast } from "react-toastify";
 import {
@@ -236,9 +237,11 @@ const PowerOfAttorney = ({ data, onChange }: any) => (
 const DocumentsTab = ({
   documents,
   entityId,
+  onChanged,
 }: {
   documents: any[];
   entityId: number;
+  onChanged?: () => void | Promise<void>;
 }) => {
   const dispatch = useAppDispatch();
   const [deleteTarget, setDeleteTarget] = useState<{
@@ -248,7 +251,11 @@ const DocumentsTab = ({
   const [deleting, setDeleting] = useState(false);
 
   const refresh = async () => {
-    await dispatch(fetchAllBuyers());
+    if (onChanged) {
+      await onChanged(); // ← parent's load(), refreshes local buyer
+    } else {
+      await dispatch(fetchAllBuyers()); // fallback for screens still on the list
+    }
   };
 
   const confirmDelete = async () => {
@@ -256,7 +263,7 @@ const DocumentsTab = ({
     setDeleting(true);
     try {
       await dispatch(deleteDocument(deleteTarget.id)).unwrap();
-      await dispatch(fetchAllBuyers());
+      await refresh();
       toast.success("Document deleted successfully");
     } catch (err: any) {
       toast.error(err || "Failed to delete document");
@@ -708,80 +715,162 @@ const PaymentPlansTab = ({
   );
 };
 
+const ORDER_STATUS_CLS: Record<string, string> = {
+  PENDING_REVIEW: "bg-amber-400 text-gray-800",
+  UNDER_REVIEW: "bg-blue-500 text-white",
+  APPROVED: "bg-teal-600 text-white",
+  ACTIVE: "bg-emerald-600 text-white",
+  COMPLETED: "bg-[#1a2a4a] text-white",
+  REJECTED: "bg-red-500 text-white",
+  CANCELLED: "bg-gray-500 text-white",
+  DEFAULTED: "bg-red-700 text-white",
+};
+
+const money = (v: string | number, cur = "SAR") =>
+  `${cur} ${Number(v).toLocaleString("en-SA", { minimumFractionDigits: 2 })}`;
+
+const BuyerOrdersTab = ({ orders }: { orders: any[] }) => {
+  const navigate = useNavigate();
+
+  if (!orders.length) {
+    return (
+      <div className="flex items-center justify-center h-48">
+        <p className="text-sm text-gray-400">
+          This buyer hasn't placed any orders yet.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
+            <th className="py-3 pr-4 font-medium">Order #</th>
+            <th className="py-3 pr-4 font-medium">Product</th>
+            <th className="py-3 pr-4 font-medium">Merchant</th>
+            <th className="py-3 pr-4 font-medium">Qty</th>
+            <th className="py-3 pr-4 font-medium">Total</th>
+            <th className="py-3 pr-4 font-medium">Status</th>
+            <th className="py-3 pr-4 font-medium">Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {orders.map((o) => (
+            <tr
+              key={o.id}
+              onClick={() => navigate(`/admin/orders/${o.id}`)}
+              className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors"
+            >
+              <td className="py-3 pr-4 font-semibold text-[#1a2a4a]">
+                #{o.id}
+              </td>
+              <td className="py-3 pr-4 text-gray-700">
+                {o.product?.name ?? "—"}
+              </td>
+              <td className="py-3 pr-4 text-gray-700">
+                {o.merchant?.companyDetails?.companyName ?? "—"}
+              </td>
+              <td className="py-3 pr-4 text-gray-700">{o.quantity}</td>
+              <td className="py-3 pr-4 text-gray-700">
+                {money(o.totalAmount, o.currency)}
+              </td>
+              <td className="py-3 pr-4">
+                <span
+                  className={`inline-block text-xs font-bold px-2.5 py-1 rounded-md ${ORDER_STATUS_CLS[o.status] ?? "bg-gray-400 text-white"}`}
+                >
+                  {o.status.replace(/_/g, " ")}
+                </span>
+              </td>
+              <td className="py-3 pr-4 text-gray-500">
+                {new Date(o.createdAt).toLocaleDateString("en-SA", {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                })}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 const EditBuyerScreen = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
-  const buyers = useAppSelector(selectBuyers);
-  const initialized = useRef(false);
 
   const [activeTab, setActiveTab] = useState(0);
-  const buyer = buyers.find((b) => b.id === Number(id));
-
-  const [status, setStatus] = useState(buyer?.status || "");
-  const [companyData, setCompanyData] = useState({
-    companyName: buyer?.companyDetails.companyName || "",
-    companyRegistrationNo: buyer?.companyDetails.companyRegistrationNo || "",
-    corporateTelephone: buyer?.companyDetails.corporateTelephone || "",
-    companyType: buyer?.companyDetails.companyType || "",
-    operationLicenseNo: buyer?.companyDetails.operationLicenseNo || "",
-    operationLicenseExpiry: buyer?.companyDetails.operationLicenseExpiry
-      ? new Date(buyer.companyDetails.operationLicenseExpiry)
-          .toISOString()
-          .split("T")[0]
-      : "",
-    sagiaNumber: buyer?.companyDetails.sagiaNumber || "",
-  });
-  const [attorneyData, setAttorneyData] = useState({
-    title: buyer?.powerOfAttorney.title || "",
-    firstName: buyer?.powerOfAttorney.firstName || "",
-    lastName: buyer?.powerOfAttorney.lastName || "",
-    mobileNumber: buyer?.powerOfAttorney.mobileNumber || "",
-    homeAddress: buyer?.powerOfAttorney.homeAddress || "",
-    city: buyer?.powerOfAttorney.city || "",
-    district: buyer?.powerOfAttorney.district || "",
-    postalCode: buyer?.powerOfAttorney.postalCode || "",
-    nationalIdNumber: buyer?.powerOfAttorney.nationalIdNumber || "",
-  });
+  const [buyer, setBuyer] = useState<BuyerDetail | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const allPlans = useAppSelector(selectPaymentPlan);
 
-  // Re-sync when buyer loads from store after redirect
-  if (buyer && !initialized.current) {
-    initialized.current = true;
-    if (!status) setStatus(buyer.status);
-    if (!companyData.companyName) {
+  const [status, setStatus] = useState("");
+  const [companyData, setCompanyData] = useState({
+    companyName: "",
+    companyRegistrationNo: "",
+    corporateTelephone: "",
+    companyType: "",
+    operationLicenseNo: "",
+    operationLicenseExpiry: "",
+    sagiaNumber: "",
+  });
+  const [attorneyData, setAttorneyData] = useState({
+    title: "",
+    firstName: "",
+    lastName: "",
+    mobileNumber: "",
+    homeAddress: "",
+    city: "",
+    district: "",
+    postalCode: "",
+    nationalIdNumber: "",
+  });
+
+  // fetch buyer + seed form
+  const load = async () => {
+    setLoading(true);
+    const result = await dispatch(fetchBuyerById(Number(id)));
+    if (fetchBuyerById.fulfilled.match(result)) {
+      const b = result.payload.buyer;
+      setBuyer(b);
+      setStatus(b.status);
       setCompanyData({
-        companyName: buyer.companyDetails.companyName ?? "",
-        companyRegistrationNo: buyer.companyDetails.companyRegistrationNo ?? "",
-        corporateTelephone: buyer.companyDetails.corporateTelephone ?? "",
-        companyType: buyer.companyDetails.companyType ?? "",
-        operationLicenseNo: buyer.companyDetails.operationLicenseNo ?? "",
-        operationLicenseExpiry: buyer.companyDetails.operationLicenseExpiry
-          ? new Date(buyer.companyDetails.operationLicenseExpiry)
+        companyName: b.companyDetails.companyName ?? "",
+        companyRegistrationNo: b.companyDetails.companyRegistrationNo ?? "",
+        corporateTelephone: b.companyDetails.corporateTelephone ?? "",
+        companyType: b.companyDetails.companyType ?? "",
+        operationLicenseNo: b.companyDetails.operationLicenseNo ?? "",
+        operationLicenseExpiry: b.companyDetails.operationLicenseExpiry
+          ? new Date(b.companyDetails.operationLicenseExpiry)
               .toISOString()
               .split("T")[0]
           : "",
-        sagiaNumber: buyer.companyDetails.sagiaNumber ?? "",
+        sagiaNumber: b.companyDetails.sagiaNumber ?? "",
       });
       setAttorneyData({
-        title: buyer.powerOfAttorney.title ?? "",
-        firstName: buyer.powerOfAttorney.firstName ?? "",
-        lastName: buyer.powerOfAttorney.lastName ?? "",
-        mobileNumber: buyer.powerOfAttorney.mobileNumber ?? "",
-        homeAddress: buyer.powerOfAttorney.homeAddress ?? "",
-        city: buyer.powerOfAttorney.city ?? "",
-        district: buyer.powerOfAttorney.district ?? "",
-        postalCode: buyer.powerOfAttorney.postalCode ?? "",
-        nationalIdNumber: buyer.powerOfAttorney.nationalIdNumber ?? "",
+        title: b.powerOfAttorney.title ?? "",
+        firstName: b.powerOfAttorney.firstName ?? "",
+        lastName: b.powerOfAttorney.lastName ?? "",
+        mobileNumber: b.powerOfAttorney.mobileNumber ?? "",
+        homeAddress: b.powerOfAttorney.homeAddress ?? "",
+        city: b.powerOfAttorney.city ?? "",
+        district: b.powerOfAttorney.district ?? "",
+        postalCode: b.powerOfAttorney.postalCode ?? "",
+        nationalIdNumber: b.powerOfAttorney.nationalIdNumber ?? "",
       });
     }
-  }
+    setLoading(false);
+  };
 
   useEffect(() => {
-    if (buyers.length === 0) dispatch(fetchAllBuyers());
-  }, [dispatch, buyers.length]);
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dispatch, id]);
 
   useEffect(() => {
     if (allPlans.length === 0) dispatch(fetchAllPaymentPlans());
@@ -792,7 +881,6 @@ const EditBuyerScreen = () => {
   const patchAttorney = (k: string, v: string) =>
     setAttorneyData((p) => ({ ...p, [k]: v }));
 
-  // ── No validation — save whatever is filled ──
   const handleSave = async () => {
     const result = await dispatch(
       updateBuyer({
@@ -824,17 +912,33 @@ const EditBuyerScreen = () => {
 
     if (updateBuyer.fulfilled.match(result)) {
       toast.success("Buyer updated successfully!");
-      await dispatch(fetchAllBuyers());
+      await load(); // refresh this buyer
     } else {
       toast.error("Failed to update buyer. Please try again.");
     }
   };
 
-  if (!buyer) {
+  if (loading) {
     return (
       <Sidebar>
         <div className="flex items-center justify-center h-64">
           <p className="text-gray-400 text-sm">Loading buyer...</p>
+        </div>
+      </Sidebar>
+    );
+  }
+
+  if (!buyer) {
+    return (
+      <Sidebar>
+        <div className="flex flex-col items-center justify-center h-64 gap-3">
+          <p className="text-gray-400 text-sm">Buyer not found.</p>
+          <button
+            onClick={() => navigate("/admin/buyer/all")}
+            className="px-5 py-2 rounded-xl text-sm font-semibold bg-[#1a2a4a] text-white"
+          >
+            Back
+          </button>
         </div>
       </Sidebar>
     );
@@ -912,6 +1016,7 @@ const EditBuyerScreen = () => {
             <Tab label="Power of Attorney" value={2} />
             <Tab label="Documents" value={3} />
             <Tab label="Payment Plans" value={4} />
+            <Tab label="Orders" value={5} />
           </Tabs>
         </div>
 
@@ -930,7 +1035,11 @@ const EditBuyerScreen = () => {
             <PowerOfAttorney data={attorneyData} onChange={patchAttorney} />
           )}
           {activeTab === 3 && (
-            <DocumentsTab documents={buyer.documents} entityId={buyer.id} />
+            <DocumentsTab
+              documents={buyer.documents}
+              entityId={buyer.id}
+              onChanged={load}
+            />
           )}
           {activeTab === 4 && (
             <PaymentPlansTab
@@ -939,6 +1048,7 @@ const EditBuyerScreen = () => {
               assignedPlans={buyer.eligiblePlans ?? []}
             />
           )}
+          {activeTab === 5 && <BuyerOrdersTab orders={buyer.orders ?? []} />}
         </div>
       </div>
     </Sidebar>

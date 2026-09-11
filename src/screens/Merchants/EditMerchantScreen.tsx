@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Sidebar from "../../components/Sidebar";
 import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
@@ -10,12 +10,13 @@ import { Input } from "../../components/Input";
 import { SelectField } from "../../components/SelectField";
 import { FileInput } from "../../components/FileInput";
 import { useNavigate, useParams } from "react-router-dom";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { useAppDispatch } from "../../store/hooks";
 import {
   deleteDocument,
   fetchAllMerchants,
-  selectMerchants,
+  fetchMerchantById,
   updateMerchant,
+  type MerchantDetail,
 } from "../../store/slices/adminSlice";
 import { toast } from "react-toastify";
 import DialogContent from "@mui/material/DialogContent";
@@ -410,9 +411,11 @@ const GNPLConfig = ({ data, onChange }: any) => (
 const DocumentsTab = ({
   documents,
   entityId,
+  onChanged,
 }: {
   documents: any[];
   entityId: number;
+  onChanged?: () => void | Promise<void>;
 }) => {
   const dispatch = useAppDispatch();
   const [deleteTarget, setDeleteTarget] = useState<{
@@ -422,7 +425,11 @@ const DocumentsTab = ({
   const [deleting, setDeleting] = useState(false);
 
   const refresh = async () => {
-    await dispatch(fetchAllMerchants());
+    if (onChanged) {
+      await onChanged(); // ← parent's load(), refreshes local merchant
+    } else {
+      await dispatch(fetchAllMerchants()); // fallback for any list-based screen
+    }
   };
 
   const confirmDelete = async () => {
@@ -430,7 +437,7 @@ const DocumentsTab = ({
     setDeleting(true);
     try {
       await dispatch(deleteDocument(deleteTarget.id)).unwrap();
-      await dispatch(fetchAllMerchants());
+      await refresh(); // ← was fetchAllMerchants(), now goes through refresh
       toast.success("Document deleted successfully");
     } catch (err: any) {
       toast.error(err || "Failed to delete document");
@@ -680,54 +687,204 @@ const DocumentsTab = ({
   );
 };
 
+const MerchantProductsTab = ({ products }: { products: any[] }) => {
+  if (!products.length) {
+    return (
+      <div className="flex items-center justify-center h-48">
+        <p className="text-sm text-gray-400">
+          This merchant has no products yet.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+      {products.map((p) => (
+        <div
+          key={p.id}
+          className="flex flex-col bg-white rounded-2xl border border-gray-100 overflow-hidden"
+        >
+          <div className="aspect-[4/3] bg-gray-50 overflow-hidden flex items-center justify-center">
+            {p.images?.[0] ? (
+              <img
+                src={p.images[0]}
+                alt={p.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <svg
+                className="w-10 h-10 text-gray-300"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M4 6h16v12H4z"
+                />
+              </svg>
+            )}
+          </div>
+          <div className="p-4">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm font-bold text-primary truncate">
+                {p.name}
+              </p>
+              <span
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex-shrink-0 ${
+                  p.status === "Active"
+                    ? "bg-green-100 text-green-700"
+                    : p.status === "Draft"
+                      ? "bg-amber-100 text-amber-700"
+                      : "bg-gray-100 text-gray-500"
+                }`}
+              >
+                {p.status}
+              </span>
+            </div>
+            <p className="text-xs text-gray-400 mt-0.5">{p.category}</p>
+            <p className="text-sm font-semibold text-primary mt-2">
+              {p.currency}{" "}
+              {Number(p.price).toLocaleString("en-SA", {
+                minimumFractionDigits: 2,
+              })}
+            </p>
+            {!p.inStock && (
+              <p className="text-xs text-red-500 mt-1">Out of stock</p>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const ORDER_STATUS_CLS: Record<string, string> = {
+  PENDING_REVIEW: "bg-amber-400 text-gray-800",
+  UNDER_REVIEW: "bg-blue-500 text-white",
+  APPROVED: "bg-teal-600 text-white",
+  ACTIVE: "bg-emerald-600 text-white",
+  COMPLETED: "bg-[#1a2a4a] text-white",
+  REJECTED: "bg-red-500 text-white",
+  CANCELLED: "bg-gray-500 text-white",
+  DEFAULTED: "bg-red-700 text-white",
+};
+
+const money = (v: string | number, cur = "SAR") =>
+  `${cur} ${Number(v).toLocaleString("en-SA", { minimumFractionDigits: 2 })}`;
+
+const MerchantOrdersTab = ({ orders }: { orders: any[] }) => {
+  const navigate = useNavigate();
+
+  if (!orders.length) {
+    return (
+      <div className="flex items-center justify-center h-48">
+        <p className="text-sm text-gray-400">
+          No orders placed with this merchant yet.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
+            <th className="py-3 pr-4 font-medium">Order #</th>
+            <th className="py-3 pr-4 font-medium">Product</th>
+            <th className="py-3 pr-4 font-medium">Buyer</th>
+            <th className="py-3 pr-4 font-medium">Qty</th>
+            <th className="py-3 pr-4 font-medium">Total</th>
+            <th className="py-3 pr-4 font-medium">Status</th>
+            <th className="py-3 pr-4 font-medium">Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {orders.map((o) => (
+            <tr
+              key={o.id}
+              onClick={() => navigate(`/admin/orders/${o.id}`)}
+              className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors"
+            >
+              <td className="py-3 pr-4 font-semibold text-[#1a2a4a]">
+                #{o.id}
+              </td>
+              <td className="py-3 pr-4 text-gray-700">
+                {o.product?.name ?? "—"}
+              </td>
+              <td className="py-3 pr-4 text-gray-700">
+                {o.buyer?.companyDetails?.companyName ?? "—"}
+              </td>
+              <td className="py-3 pr-4 text-gray-700">{o.quantity}</td>
+              <td className="py-3 pr-4 text-gray-700">
+                {money(o.totalAmount, o.currency)}
+              </td>
+              <td className="py-3 pr-4">
+                <span
+                  className={`inline-block text-xs font-bold px-2.5 py-1 rounded-md ${ORDER_STATUS_CLS[o.status] ?? "bg-gray-400 text-white"}`}
+                >
+                  {o.status.replace(/_/g, " ")}
+                </span>
+              </td>
+              <td className="py-3 pr-4 text-gray-500">
+                {new Date(o.createdAt).toLocaleDateString("en-SA", {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                })}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 const EditMerchantScreen = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
-  const merchants = useAppSelector(selectMerchants);
 
   const [activeTab, setActiveTab] = useState(0);
-  const initialized = useRef(false);
 
-  const merchant = merchants.find((m) => m.id === Number(id));
+  const [merchant, setMerchant] = useState<MerchantDetail | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const [status, setStatus] = useState(merchant?.status || "");
+  // const merchant = merchants.find((m) => m.id === Number(id));
+
+  const [status, setStatus] = useState("");
   const [companyData, setCompanyData] = useState({
-    companyType: merchant?.companyDetails.companyType || "",
-    companyName: merchant?.companyDetails.companyName || "",
-    companyPresence: merchant?.companyDetails.companyPresence || "",
-    ecommerceUrl: merchant?.companyDetails.ecommerceUrl || "",
-    corporateTelephone: merchant?.companyDetails.corporateTelephone || "",
-    companyRegistrationNo: merchant?.companyDetails.companyRegistrationNo || "",
-    annualTurnover: merchant?.companyDetails.annualTurnover?.toString() || "",
-    numberOfEmployees:
-      merchant?.companyDetails.numberOfEmployees?.toString() || "",
-    operationLicenseNo: merchant?.companyDetails.operationLicenseNo || "",
-    operationLicenseExpiry: merchant?.companyDetails.operationLicenseExpiry
-      ? new Date(merchant.companyDetails.operationLicenseExpiry)
-          .toISOString()
-          .split("T")[0]
-      : "",
-    sagiaNumber: merchant?.companyDetails.sagiaNumber || "",
+    companyType: "",
+    companyName: "",
+    companyPresence: "",
+    ecommerceUrl: "",
+    corporateTelephone: "",
+    companyRegistrationNo: "",
+    annualTurnover: "",
+    numberOfEmployees: "",
+    operationLicenseNo: "",
+    operationLicenseExpiry: "",
+    sagiaNumber: "",
   });
   const [attorneyData, setAttorneyData] = useState({
-    title: merchant?.powerOfAttorney.title || "",
-    firstName: merchant?.powerOfAttorney.firstName || "",
-    lastName: merchant?.powerOfAttorney.lastName || "",
-    nationality: merchant?.powerOfAttorney.nationality || "",
-    mobileNumber: merchant?.powerOfAttorney.mobileNumber || "",
-    dateOfBirth: merchant?.powerOfAttorney.dateOfBirth
-      ? new Date(merchant.powerOfAttorney.dateOfBirth)
-          .toISOString()
-          .split("T")[0]
-      : "",
-    placeOfBirth: merchant?.powerOfAttorney.placeOfBirth || "",
-    homeAddress: merchant?.powerOfAttorney.homeAddress || "",
-    city: merchant?.powerOfAttorney.city || "",
-    district: merchant?.powerOfAttorney.district || "",
-    postalCode: merchant?.powerOfAttorney.postalCode || "",
-    nationalIdNumber: merchant?.powerOfAttorney.nationalIdNumber || "",
+    title: "",
+    firstName: "",
+    lastName: "",
+    nationality: "",
+    mobileNumber: "",
+    dateOfBirth: "",
+    placeOfBirth: "",
+    homeAddress: "",
+    city: "",
+    district: "",
+    postalCode: "",
+    nationalIdNumber: "",
   });
 
   // Split invoicing mobile into country code + number for the UI
@@ -737,71 +894,70 @@ const EditMerchantScreen = () => {
       ? { code: match.code, number: full.slice(match.code.length) }
       : { code: "+966", number: full };
   };
-  const split = splitMobile(merchant?.gnplConfig?.invoicingMobile || "");
 
   const [gnplData, setGnplData] = useState({
-    invoicingEmail: merchant?.gnplConfig?.invoicingEmail || "",
-    invoicingCountryCode: split.code,
-    invoicingMobile: split.number,
-    payoutPlan: merchant?.gnplConfig?.payoutPlan || "",
+    invoicingEmail: "",
+    invoicingCountryCode: "+966",
+    invoicingMobile: "",
+    payoutPlan: "",
   });
 
   // Re-sync when merchant loads from store (e.g. after redirect from create)
-  if (merchant && !initialized.current) {
-    initialized.current = true;
-    if (!status) setStatus(merchant.status);
-    if (!companyData.companyName) {
+  const load = async () => {
+    setLoading(true);
+    const result = await dispatch(fetchMerchantById(Number(id)));
+    if (fetchMerchantById.fulfilled.match(result)) {
+      const m = result.payload.merchant;
+      setMerchant(m);
+      setStatus(m.status);
       setCompanyData({
-        companyType: merchant.companyDetails.companyType ?? "",
-        companyName: merchant.companyDetails.companyName ?? "",
-        companyPresence: merchant.companyDetails.companyPresence ?? "",
-        ecommerceUrl: merchant.companyDetails.ecommerceUrl ?? "",
-        corporateTelephone: merchant.companyDetails.corporateTelephone ?? "",
-        companyRegistrationNo:
-          merchant.companyDetails.companyRegistrationNo ?? "",
-        annualTurnover:
-          merchant.companyDetails.annualTurnover?.toString() ?? "",
-        numberOfEmployees:
-          merchant.companyDetails.numberOfEmployees?.toString() ?? "",
-        operationLicenseNo: merchant.companyDetails.operationLicenseNo ?? "",
-        operationLicenseExpiry: merchant.companyDetails.operationLicenseExpiry
-          ? new Date(merchant.companyDetails.operationLicenseExpiry)
+        companyType: m.companyDetails.companyType ?? "",
+        companyName: m.companyDetails.companyName ?? "",
+        companyPresence: m.companyDetails.companyPresence ?? "",
+        ecommerceUrl: m.companyDetails.ecommerceUrl ?? "",
+        corporateTelephone: m.companyDetails.corporateTelephone ?? "",
+        companyRegistrationNo: m.companyDetails.companyRegistrationNo ?? "",
+        annualTurnover: m.companyDetails.annualTurnover?.toString() ?? "",
+        numberOfEmployees: m.companyDetails.numberOfEmployees?.toString() ?? "",
+        operationLicenseNo: m.companyDetails.operationLicenseNo ?? "",
+        operationLicenseExpiry: m.companyDetails.operationLicenseExpiry
+          ? new Date(m.companyDetails.operationLicenseExpiry)
               .toISOString()
               .split("T")[0]
           : "",
-        sagiaNumber: merchant.companyDetails.sagiaNumber ?? "",
+        sagiaNumber: m.companyDetails.sagiaNumber ?? "",
       });
-      const s = splitMobile(merchant.gnplConfig?.invoicingMobile || "");
       setAttorneyData({
-        title: merchant.powerOfAttorney.title ?? "",
-        firstName: merchant.powerOfAttorney.firstName ?? "",
-        lastName: merchant.powerOfAttorney.lastName ?? "",
-        nationality: merchant.powerOfAttorney.nationality ?? "",
-        mobileNumber: merchant.powerOfAttorney.mobileNumber ?? "",
-        dateOfBirth: merchant.powerOfAttorney.dateOfBirth
-          ? new Date(merchant.powerOfAttorney.dateOfBirth)
-              .toISOString()
-              .split("T")[0]
+        title: m.powerOfAttorney.title ?? "",
+        firstName: m.powerOfAttorney.firstName ?? "",
+        lastName: m.powerOfAttorney.lastName ?? "",
+        nationality: m.powerOfAttorney.nationality ?? "",
+        mobileNumber: m.powerOfAttorney.mobileNumber ?? "",
+        dateOfBirth: m.powerOfAttorney.dateOfBirth
+          ? new Date(m.powerOfAttorney.dateOfBirth).toISOString().split("T")[0]
           : "",
-        placeOfBirth: merchant.powerOfAttorney.placeOfBirth ?? "",
-        homeAddress: merchant.powerOfAttorney.homeAddress ?? "",
-        city: merchant.powerOfAttorney.city ?? "",
-        district: merchant.powerOfAttorney.district ?? "",
-        postalCode: merchant.powerOfAttorney.postalCode ?? "",
-        nationalIdNumber: merchant.powerOfAttorney.nationalIdNumber ?? "",
+        placeOfBirth: m.powerOfAttorney.placeOfBirth ?? "",
+        homeAddress: m.powerOfAttorney.homeAddress ?? "",
+        city: m.powerOfAttorney.city ?? "",
+        district: m.powerOfAttorney.district ?? "",
+        postalCode: m.powerOfAttorney.postalCode ?? "",
+        nationalIdNumber: m.powerOfAttorney.nationalIdNumber ?? "",
       });
+      const s = splitMobile(m.gnplConfig?.invoicingMobile || "");
       setGnplData({
-        invoicingEmail: merchant.gnplConfig?.invoicingEmail ?? "",
+        invoicingEmail: m.gnplConfig?.invoicingEmail ?? "",
         invoicingCountryCode: s.code,
         invoicingMobile: s.number,
-        payoutPlan: merchant.gnplConfig?.payoutPlan ?? "",
+        payoutPlan: m.gnplConfig?.payoutPlan ?? "",
       });
     }
-  }
+    setLoading(false);
+  };
 
   useEffect(() => {
-    if (merchants.length === 0) dispatch(fetchAllMerchants());
-  }, [dispatch, merchants.length]);
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dispatch, id]);
 
   const patchCompany = (k: string, v: string) =>
     setCompanyData((p) => ({ ...p, [k]: v }));
@@ -857,16 +1013,33 @@ const EditMerchantScreen = () => {
 
     if (updateMerchant.fulfilled.match(result)) {
       toast.success("Merchant updated successfully!");
+      await load();
     } else {
       toast.error("Failed to update merchant. Please try again.");
     }
   };
 
-  if (!merchant) {
+  if (loading) {
     return (
       <Sidebar>
         <div className="flex items-center justify-center h-64">
           <p className="text-gray-400 text-sm">Loading merchant...</p>
+        </div>
+      </Sidebar>
+    );
+  }
+
+  if (!merchant) {
+    return (
+      <Sidebar>
+        <div className="flex flex-col items-center justify-center h-64 gap-3">
+          <p className="text-gray-400 text-sm">Merchant not found.</p>
+          <button
+            onClick={() => navigate("/admin/merchant/all")}
+            className="px-5 py-2 rounded-xl text-sm font-semibold bg-[#1a2a4a] text-white"
+          >
+            Back
+          </button>
         </div>
       </Sidebar>
     );
@@ -944,6 +1117,8 @@ const EditMerchantScreen = () => {
             <Tab label="Power of Attorney" value={2} />
             <Tab label="GNPL Config" value={3} />
             <Tab label="Documents" value={4} />
+            <Tab label="Products" value={5} />
+            <Tab label="Orders" value={6} />
           </Tabs>
         </div>
 
@@ -968,7 +1143,14 @@ const EditMerchantScreen = () => {
             <DocumentsTab
               documents={merchant.documents}
               entityId={merchant.id}
+              onChanged={load}
             />
+          )}
+          {activeTab === 5 && (
+            <MerchantProductsTab products={merchant.products ?? []} />
+          )}
+          {activeTab === 6 && (
+            <MerchantOrdersTab orders={merchant.orders ?? []} />
           )}
         </div>
       </div>

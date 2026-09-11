@@ -63,6 +63,72 @@ export interface Buyer {
   eligiblePlans?: { id: number; planName: string }[]; // ← add
 }
 
+export interface BuyerDetail {
+  id: number;
+  userId: number;
+  status: string;
+  creditLimit: string | null;
+  createdAt: string;
+  updatedAt: string;
+  user: { name: string | null; email: string };
+  companyDetails: {
+    id: number;
+    companyName: string;
+    companyType: string;
+    companyRegistrationNo: string;
+    corporateTelephone: string;
+    operationLicenseNo: string | null;
+    operationLicenseExpiry: string | null;
+    sagiaNumber: string | null;
+    annualTurnover: number | null;
+    numberOfEmployees: number | null;
+    companyPresence: string | null;
+    ecommerceUrl: string | null;
+    createdAt: string;
+    updatedAt: string;
+  };
+
+  powerOfAttorney: {
+    id: number;
+    title: string;
+    firstName: string;
+    lastName: string;
+    mobileNumber: string;
+    homeAddress: string;
+    city: string;
+    district: string;
+    postalCode: string;
+    nationalIdNumber: string;
+    nationality: string | null;
+    dateOfBirth: string | null;
+    placeOfBirth: string | null;
+    createdAt: string;
+    updatedAt: string;
+  };
+
+  documents: {
+    id: number;
+    documentType: string;
+    fileUrl: string;
+    fileName: string;
+    filePath: string | null;
+    uploadedAt: string;
+    buyerId: number | null;
+    merchantId: number | null;
+  }[];
+  eligiblePlans: any[];
+  orders: {
+    id: number;
+    quantity: number;
+    totalAmount: string;
+    currency: string;
+    status: string;
+    createdAt: string;
+    product?: { id: number; name: string; category: string; currency: string };
+    merchant?: { companyDetails?: { companyName: string } };
+  }[];
+}
+
 export interface Merchant {
   id: number;
   userId: number;
@@ -75,6 +141,105 @@ export interface Merchant {
   gnplConfig: GNPLConfig | null;
 }
 
+export interface MerchantDetail {
+  id: number;
+  userId: number;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+
+  user: {
+    name: string | null;
+    email: string;
+  };
+
+  companyDetails: {
+    id: number;
+    companyName: string;
+    companyType: string;
+    companyRegistrationNo: string;
+    corporateTelephone: string;
+    operationLicenseNo: string | null;
+    operationLicenseExpiry: string | null;
+    sagiaNumber: string | null;
+    annualTurnover: number | null;
+    numberOfEmployees: number | null;
+    companyPresence: string | null;
+    ecommerceUrl: string | null;
+    createdAt: string;
+    updatedAt: string;
+  };
+
+  powerOfAttorney: {
+    id: number;
+    title: string;
+    firstName: string;
+    lastName: string;
+    mobileNumber: string;
+    homeAddress: string;
+    city: string;
+    district: string;
+    postalCode: string;
+    nationalIdNumber: string;
+    nationality: string | null;
+    dateOfBirth: string | null;
+    placeOfBirth: string | null;
+    createdAt: string;
+    updatedAt: string;
+  };
+
+  gnplConfig: {
+    id: number;
+    merchantId: number;
+    invoicingEmail: string;
+    invoicingMobile: string;
+    payoutPlan: string;
+    createdAt: string;
+    updatedAt: string;
+  } | null;
+
+  documents: {
+    id: number;
+    documentType: string;
+    fileUrl: string;
+    fileName: string;
+    filePath: string | null;
+    uploadedAt: string;
+    merchantId: number | null;
+    buyerId: number | null;
+  }[];
+
+  products: MerchantProduct[];
+
+  orders: {
+    id: number;
+    quantity: number;
+    totalAmount: string;
+    currency: string;
+    status: string;
+    createdAt: string;
+    product?: { id: number; name: string; category: string; currency: string };
+    buyer?: { companyDetails?: { companyName: string } };
+  }[];
+}
+
+export interface MerchantProduct {
+  id: number;
+  name: string;
+  description: string | null;
+  category: string;
+  price: string; // Prisma Decimal → string over JSON
+  currency: string;
+  images: string[];
+  minOrder: number;
+  unit: string;
+  inStock: boolean;
+  sku: string | null;
+  status: string; // Active | Inactive | Draft
+  merchantId: number;
+  createdAt: string;
+  updatedAt: string;
+}
 // ─── Shared Input Payload Types ───────────────────────────────────────────────
 
 interface BuyerCompanyPayload {
@@ -430,6 +595,21 @@ export const fetchAllBuyers = createAsyncThunk<
   }
 });
 
+export const fetchBuyerById = createAsyncThunk<
+  { buyer: BuyerDetail },
+  number,
+  { rejectValue: string }
+>("admin/fetchBuyerById", async (id, { rejectWithValue }) => {
+  try {
+    const res = await apiFetch(`/api/buyer/${id}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || "Failed to fetch buyer");
+    return data;
+  } catch (err: any) {
+    return rejectWithValue(err.message);
+  }
+});
+
 export const fetchAllMerchants = createAsyncThunk<
   MerchantListResponse,
   void,
@@ -439,6 +619,21 @@ export const fetchAllMerchants = createAsyncThunk<
     const res = await apiFetch("/api/merchant/merchants/all");
     const data = await res.json();
     if (!res.ok) throw new Error(data.message || "Failed to fetch merchants");
+    return data;
+  } catch (err: any) {
+    return rejectWithValue(err.message);
+  }
+});
+
+export const fetchMerchantById = createAsyncThunk<
+  { merchant: MerchantDetail },
+  number,
+  { rejectValue: string }
+>("admin/fetchMerchantById", async (id, { rejectWithValue }) => {
+  try {
+    const res = await apiFetch(`/api/merchant/${id}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || "Failed to fetch merchant");
     return data;
   } catch (err: any) {
     return rejectWithValue(err.message);
